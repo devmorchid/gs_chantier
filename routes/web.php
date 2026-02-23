@@ -1,6 +1,6 @@
 <?php
-
 use App\Http\Controllers\ChantierController;
+use App\Http\Controllers\ChargeController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DevisController;
 use App\Http\Controllers\EquipeController;
@@ -10,6 +10,10 @@ use App\Http\Controllers\ServiceDetailController;
 use App\Http\Controllers\TechnicienController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\CatalogServiceController;
+use App\Http\Controllers\VenteController;
+use App\Models\Chantier;
+use App\Models\Stock;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -145,6 +149,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('achats', \App\Http\Controllers\AchatController::class)->only(['index', 'create', 'store', 'show']);
         Route::get('achats/{achat}/pdf', [\App\Http\Controllers\AchatController::class, 'pdf'])
             ->name('achats.pdf');
+        Route::resource('ventes', VenteController::class)->only(['index', 'create', 'store', 'show']);
+        Route::get('ventes/{vente}/pdf', [VenteController::class, 'pdf'])
+            ->name('ventes.pdf');
     });
 
     // Mouvements de stock (Admin & Chef de chantier)
@@ -159,6 +166,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('notifications.approve');
         Route::post('notifications/{transfer}/reject', [\App\Http\Controllers\NotificationController::class, 'reject'])
             ->name('notifications.reject');
+    });
+
+    // Charges (Admin & Chef de chantier)
+    Route::middleware(['role:admin|chef_chantier'])->group(function () {
+        Route::resource('charges', ChargeController::class)
+            ->only(['index', 'create', 'store', 'show']);
+        Route::get('charges/{charge}/pdf', [ChargeController::class, 'pdf'])
+            ->name('charges.pdf');
+    });
+
+    // Charges update workflow (Admin & Chef de chantier)
+    Route::middleware(['role:admin|chef_chantier'])->group(function () {
+        Route::get('charges/{charge}/edit', [ChargeController::class, 'edit'])
+            ->name('charges.edit');
+        Route::put('charges/{charge}', [ChargeController::class, 'update'])
+            ->name('charges.update');
     });
 
     // Devis (Admin et Chef de chantier)
@@ -218,6 +241,52 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ]);
         })->name('cheques.dashboard');
     });
+    // Page de test: produits d'un chantier
+    Route::middleware(['role:admin|chef_chantier'])->get('test/produits-chantier', function (Request $request) {
+        $chantierId = 4;
+        $chantier = Chantier::findOrFail($chantierId);
+        $user = $request->user();
+
+        if ($user && $user->hasRole('chef_chantier') && $chantier->user_id !== $user->id) {
+            abort(403);
+        }
+
+        $stocks = Stock::with(['produit.category', 'produit.fournisseur'])
+            ->where('chantier_id', $chantierId)
+            ->get();
+
+        $produits = $stocks
+            ->map(function (Stock $stock) {
+                if (!$stock->produit) {
+                    return null;
+                }
+
+                $categoryRelation = $stock->produit->getRelation('category');
+                $fournisseurRelation = $stock->produit->getRelation('fournisseur');
+                $categoryName = $categoryRelation?->name ?? ($stock->produit->category ?? null);
+                $fournisseurName = $fournisseurRelation?->name ?? ($stock->produit->fournisseur ?? null);
+
+                return [
+                    'id' => $stock->produit->id,
+                    'name' => $stock->produit->name,
+                    'code_barre' => $stock->produit->code_barre,
+                    'category' => $categoryName,
+                    'fournisseur' => $fournisseurName,
+                    'quantite' => $stock->quantite,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        return Inertia::render('tests/produits-chantier', [
+            'chantier' => [
+                'id' => $chantier->id,
+                'nom' => $chantier->nom,
+                'reference' => $chantier->reference,
+            ],
+            'produits' => $produits,
+        ]);
+    })->name('test.produits-chantier');
 });
 
 require __DIR__.'/settings.php';

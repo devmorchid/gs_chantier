@@ -51,10 +51,11 @@ export default function StockMouvementsCreate({ produits, chantiers, destination
 
   const originChantier = useMemo(() => chantiers.find((chantier) => chantier.nom === data.origine), [chantiers, data.origine]);
   const originProduits = useMemo(() => {
-    if (!isChefChantier) return produits;
+    if (!data.origine) return [];
+    if (data.origine === 'Depot') return produits;
     if (!originChantier) return [];
     return produitsByChantier[originChantier.id] ?? [];
-  }, [isChefChantier, originChantier, produits, produitsByChantier]);
+  }, [data.origine, originChantier, produits, produitsByChantier]);
 
   const getFilteredProduits = (query: string, currentIndex: number) => {
     const normalized = query.trim().toLowerCase();
@@ -156,134 +157,6 @@ export default function StockMouvementsCreate({ produits, chantiers, destination
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">Produit & type</p>
-                    <p className="text-xs text-muted-foreground">Identifiez clairement le mouvement</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Champs requis *</span>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="font-medium">Produits <span className="text-destructive">*</span></label>
-                    <div className="space-y-3">
-                      {data.items.map((item, index) => {
-                        const filteredProduits = getFilteredProduits(item.produit, index);
-                        const selectedProduit = getSelectedProduit(index);
-                        const maxQuantite = selectedProduit?.quantite;
-                        return (
-                          <div key={index} className="grid gap-2 md:grid-cols-[2fr_1fr_auto] items-start">
-                            <div className="relative">
-                              <Input
-                                value={item.produit}
-                                onChange={(e) => {
-                                  const next = [...data.items];
-                                  next[index] = { ...next[index], produit: e.target.value };
-                                  setData('items', next);
-                                  setActiveProduitIndex(index);
-                                  setShowProduitSuggestions(true);
-                                }}
-                                onFocus={() => {
-                                  setActiveProduitIndex(index);
-                                  setShowProduitSuggestions(true);
-                                }}
-                                onBlur={() => setTimeout(() => setShowProduitSuggestions(false), 120)}
-                                disabled={isChefChantier && (!data.origine || !data.destination)}
-                                required
-                                placeholder={
-                                  isChefChantier && (!data.origine || !data.destination)
-                                    ? 'Sélectionnez origine et destination'
-                                    : 'Nom du produit'
-                                }
-                                autoComplete="off"
-                              />
-                              {showProduitSuggestions && activeProduitIndex === index && filteredProduits.length > 0 && (
-                                <div className="absolute z-10 mt-1 w-full rounded-md border border-border/60 bg-background shadow-lg">
-                                  <ul className="max-h-48 overflow-auto py-1 text-sm">
-                                    {filteredProduits.map((produit) => (
-                                      <li key={produit.id}>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const next = [...data.items];
-                                            next[index] = { ...next[index], produit: produit.name };
-                                            setData('items', next);
-                                            setShowProduitSuggestions(false);
-                                          }}
-                                          className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-muted/60"
-                                        >
-                                          <span className="truncate">{produit.name}</span>
-                                          <span className="text-xs text-muted-foreground">Qté: {produit.quantite ?? 0}</span>
-                                        </button>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                            </div>
-                            <Input
-                              type="number"
-                              min={1}
-                              max={isChefChantier && typeof maxQuantite === 'number' ? Math.max(maxQuantite, 1) : undefined}
-                              value={item.quantite}
-                              onChange={(e) => {
-                                const nextValue = Number(e.target.value);
-                                const next = [...data.items];
-                                if (isChefChantier && typeof maxQuantite === 'number') {
-                                  next[index] = { ...next[index], quantite: Math.min(nextValue, Math.max(maxQuantite, 1)) };
-                                } else {
-                                  next[index] = { ...next[index], quantite: nextValue };
-                                }
-                                setData('items', next);
-                              }}
-                              required
-                            />
-                            <div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                  const next = data.items.filter((_, i) => i !== index);
-                                  setData('items', next.length ? next : [{ produit: '', quantite: 1 }]);
-                                }}
-                              >
-                                Retirer
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setData('items', [...data.items, { produit: '', quantite: 1 }])}
-                      >
-                        Ajouter un produit
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {isChefChantier ? 'Sélectionnez origine + destination pour afficher les produits.' : 'Ajoutez un ou plusieurs produits.'}
-                    </p>
-                    {errors.items && <div className="text-red-500 text-xs mt-1">{errors.items}</div>}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="font-medium">Type <span className="text-destructive">*</span></label>
-                    <Select value={data.type} onValueChange={(v: string) => setData('type', v)} required disabled={isChefChantier}>
-                      <SelectTrigger className="w-full">
-                        {data.type === 'transfert' ? 'Transfert' : data.type === 'retour' ? 'Retour' : 'Sélectionner...'}
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="transfert">Transfert</SelectItem>
-                        {!isChefChantier && <SelectItem value="retour">Retour</SelectItem>}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">Choisissez la nature du mouvement.</p>
-                    {errors.type && <div className="text-red-500 text-xs mt-1">{errors.type}</div>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
                 <div className="mb-4">
                   <p className="text-sm font-semibold">Trajet du mouvement</p>
                   <p className="text-xs text-muted-foreground">D’où vient et où va le stock</p>
@@ -348,7 +221,7 @@ export default function StockMouvementsCreate({ produits, chantiers, destination
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {isChefChantier ? 'Origine obligatoire (vos chantiers).' : 'Optionnel, utile pour tracer le flux.'}
+                      {isChefChantier ? 'Origine obligatoire (vos chantiers).' : 'Origine obligatoire pour filtrer les produits.'}
                     </p>
                     {errors.origine && <div className="text-red-500 text-xs mt-1">{errors.origine}</div>}
                     {localErrors.origine && <div className="text-red-500 text-xs mt-1">{localErrors.origine}</div>}
@@ -415,6 +288,138 @@ export default function StockMouvementsCreate({ produits, chantiers, destination
                     <p className="text-xs text-muted-foreground">Indiquez le lieu ou l’équipe de destination.</p>
                     {errors.destination && <div className="text-red-500 text-xs mt-1">{errors.destination}</div>}
                     {localErrors.destination && <div className="text-red-500 text-xs mt-1">{localErrors.destination}</div>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">Produit & type</p>
+                    <p className="text-xs text-muted-foreground">Identifiez clairement le mouvement</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">Champs requis *</span>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="font-medium">Produits <span className="text-destructive">*</span></label>
+                    <div className="space-y-3">
+                      {data.items.map((item, index) => {
+                        const filteredProduits = getFilteredProduits(item.produit, index);
+                        const selectedProduit = getSelectedProduit(index);
+                        const maxQuantite = selectedProduit?.quantite;
+                        const quantityLabel = data.origine === 'Depot' ? 'Qté dépôt' : 'Qté chantier';
+                        return (
+                          <div key={index} className="grid gap-2 md:grid-cols-[2fr_1fr_auto] items-start">
+                            <div className="relative">
+                              <Input
+                                value={item.produit}
+                                onChange={(e) => {
+                                  const next = [...data.items];
+                                  next[index] = { ...next[index], produit: e.target.value };
+                                  setData('items', next);
+                                  setActiveProduitIndex(index);
+                                  setShowProduitSuggestions(true);
+                                }}
+                                onFocus={() => {
+                                  setActiveProduitIndex(index);
+                                  setShowProduitSuggestions(true);
+                                }}
+                                onBlur={() => setTimeout(() => setShowProduitSuggestions(false), 120)}
+                                  disabled={!data.origine}
+                                required
+                                placeholder={
+                                    !data.origine
+                                      ? 'Sélectionnez une origine'
+                                    : 'Nom du produit'
+                                }
+                                autoComplete="off"
+                              />
+                              {showProduitSuggestions && activeProduitIndex === index && filteredProduits.length > 0 && (
+                                <div className="absolute z-10 mt-1 w-full rounded-md border border-border/60 bg-background shadow-lg">
+                                  <ul className="max-h-48 overflow-auto py-1 text-sm">
+                                    {filteredProduits.map((produit) => (
+                                      <li key={produit.id}>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const next = [...data.items];
+                                            next[index] = { ...next[index], produit: produit.name };
+                                            setData('items', next);
+                                            setShowProduitSuggestions(false);
+                                          }}
+                                          className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-muted/60"
+                                        >
+                                          <span className="truncate">{produit.name}</span>
+                                          <span className="text-xs text-muted-foreground">{quantityLabel}: {produit.quantite ?? 0}</span>
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {data.origine && data.origine !== 'Depot' && selectedProduit && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  Disponible chantier: {selectedProduit.quantite ?? 0}
+                                </p>
+                              )}
+                            </div>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={isChefChantier && typeof maxQuantite === 'number' ? Math.max(maxQuantite, 1) : undefined}
+                              value={item.quantite}
+                              onChange={(e) => {
+                                const nextValue = Number(e.target.value);
+                                const next = [...data.items];
+                                if (isChefChantier && typeof maxQuantite === 'number') {
+                                  next[index] = { ...next[index], quantite: Math.min(nextValue, Math.max(maxQuantite, 1)) };
+                                } else {
+                                  next[index] = { ...next[index], quantite: nextValue };
+                                }
+                                setData('items', next);
+                              }}
+                              required
+                            />
+                            <div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  const next = data.items.filter((_, i) => i !== index);
+                                  setData('items', next.length ? next : [{ produit: '', quantite: 1 }]);
+                                }}
+                              >
+                                Retirer
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setData('items', [...data.items, { produit: '', quantite: 1 }])}
+                      >
+                        Ajouter un produit
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Sélectionnez une origine pour afficher les produits.</p>
+                    {errors.items && <div className="text-red-500 text-xs mt-1">{errors.items}</div>}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="font-medium">Type <span className="text-destructive">*</span></label>
+                    <Select value={data.type} onValueChange={(v: string) => setData('type', v)} required disabled={isChefChantier}>
+                      <SelectTrigger className="w-full">
+                        {data.type === 'transfert' ? 'Transfert' : data.type === 'retour' ? 'Retour' : 'Sélectionner...'}
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="transfert">Transfert</SelectItem>
+                        {!isChefChantier && <SelectItem value="retour">Retour</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Choisissez la nature du mouvement.</p>
+                    {errors.type && <div className="text-red-500 text-xs mt-1">{errors.type}</div>}
                   </div>
                 </div>
               </div>

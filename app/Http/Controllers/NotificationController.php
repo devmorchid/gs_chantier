@@ -6,6 +6,8 @@ use App\Models\Chantier;
 use App\Models\Stock;
 use App\Models\StockMouvement;
 use App\Models\StockTransferRequest;
+use App\Notifications\ChargeDecisionNotification;
+use App\Notifications\ChargeSubmittedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +19,18 @@ class NotificationController extends Controller
     {
         $user = $request->user();
         $destinationChantierIds = Chantier::where('user_id', $user->id)->pluck('id');
+        $tab = $request->string('tab')->toString();
+        if (!in_array($tab, ['all', 'incoming', 'outgoing', 'charge'], true)) {
+            $tab = 'all';
+        }
+
+        $incomingRequestedLimit = max(3, min((int) $request->integer('incoming_limit', 12), 5000));
+        $outgoingRequestedLimit = max(3, min((int) $request->integer('outgoing_limit', 12), 5000));
+        $chargeRequestedLimit = max(3, min((int) $request->integer('charge_limit', 20), 5000));
+
+        $incomingLimit = in_array($tab, ['all', 'incoming'], true) ? $incomingRequestedLimit : 3;
+        $outgoingLimit = in_array($tab, ['all', 'outgoing'], true) ? $outgoingRequestedLimit : 3;
+        $chargeLimit = in_array($tab, ['all', 'charge'], true) ? $chargeRequestedLimit : 3;
 
         $baseQuery = StockTransferRequest::query()
             ->with([
@@ -29,21 +43,35 @@ class NotificationController extends Controller
                 'origineChantier:id,nom',
             ]);
 
+        $incomingTotal = 0;
         $incomingRequests = collect();
         if ($destinationChantierIds->isNotEmpty()) {
+            $incomingTotal = (clone $baseQuery)
+                ->where('status', 'pending')
+                ->whereIn('destination_chantier_id', $destinationChantierIds)
+                ->orderByDesc('created_at')
+                ->count();
+
             $incomingRequests = (clone $baseQuery)
                 ->where('status', 'pending')
                 ->whereIn('destination_chantier_id', $destinationChantierIds)
                 ->orderByDesc('created_at')
+                ->limit($incomingLimit)
                 ->get();
         }
+
+        $outgoingTotal = (clone $baseQuery)
+            ->where('requester_id', $user->id)
+            ->orderByDesc('created_at')
+            ->count();
 
         $outgoingRequests = (clone $baseQuery)
             ->where('requester_id', $user->id)
             ->orderByDesc('created_at')
+            ->limit($outgoingLimit)
             ->get();
 
-        if ($outgoingRequests->isNotEmpty()) {
+        if ($outgoingTotal > 0) {
             StockTransferRequest::query()
                 ->where('requester_id', $user->id)
                 ->whereIn('status', ['approved', 'rejected'])
@@ -51,9 +79,64 @@ class NotificationController extends Controller
                 ->update(['requester_read_at' => now()]);
         }
 
+        $chargeQuery = $user->notifications()
+            ->whereIn('type', [
+                ChargeSubmittedNotification::class,
+                ChargeDecisionNotification::class,
+            ]);
+
+        $chargeTotal = (clone $chargeQuery)->count();
+
+        $chargeNotifications = (clone $chargeQuery)
+            ->latest()
+            ->limit($chargeLimit)
+            ->get()
+            ->map(fn ($notification) => [
+                'id' => $notification->id,
+                'type' => $notification->type,
+                'is_read' => $notification->read_at !== null,
+                'created_at' => $notification->created_at?->format('d/m/Y H:i'),
+                'title' => data_get($notification->data, 'title', 'Notification charge'),
+                'message' => data_get($notification->data, 'message', ''),
+                'status' => data_get($notification->data, 'status'),
+                'rejection_reason' => data_get($notification->data, 'rejection_reason'),
+                'is_resubmission' => (bool) data_get($notification->data, 'is_resubmission', false),
+                'charge_reference' => data_get($notification->data, 'charge_reference'),
+                'url' => data_get($notification->data, 'url'),
+            ]);
+
+        $user->unreadNotifications()
+            ->whereIn('type', [
+                ChargeSubmittedNotification::class,
+                ChargeDecisionNotification::class,
+            ])
+            ->update(['read_at' => now()]);
+
         return Inertia::render('notifications/index', [
             'incomingRequests' => $incomingRequests,
             'outgoingRequests' => $outgoingRequests,
+            'chargeNotifications' => $chargeNotifications,
+            'activeTab' => $tab,
+            'meta' => [
+                'incoming' => [
+                    'shown' => $incomingRequests->count(),
+                    'total' => $incomingTotal,
+                    'limit' => $incomingLimit,
+                    'has_more' => $incomingTotal > $incomingRequests->count(),
+                ],
+                'outgoing' => [
+                    'shown' => $outgoingRequests->count(),
+                    'total' => $outgoingTotal,
+                    'limit' => $outgoingLimit,
+                    'has_more' => $outgoingTotal > $outgoingRequests->count(),
+                ],
+                'charge' => [
+                    'shown' => $chargeNotifications->count(),
+                    'total' => $chargeTotal,
+                    'limit' => $chargeLimit,
+                    'has_more' => $chargeTotal > $chargeNotifications->count(),
+                ],
+            ],
         ]);
     }
 

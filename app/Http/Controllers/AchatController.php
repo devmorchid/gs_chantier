@@ -39,7 +39,7 @@ class AchatController extends Controller
 			})
 			->orderByDesc('date');
 
-		$achats = $query->paginate(15)->withQueryString();
+		$achats = $query->paginate(20)->withQueryString();
 		$achats->getCollection()->transform(fn (Achat $achat) => [
 			'id' => $achat->id,
 			'reference' => $achat->reference,
@@ -60,8 +60,24 @@ class AchatController extends Controller
 
 	public function create()
 	{
+		$stockByProduit = Stock::query()
+			->where('location_type', 'depot')
+			->whereNull('chantier_id')
+			->pluck('quantite', 'produit_id');
+
 		$produits = Produit::orderBy('name')
-			->get(['id', 'name', 'prix_achat', 'prix_vente', 'code_barre']);
+			->get(['id', 'name', 'prix_achat', 'prix_vente', 'code_barre'])
+			->map(function ($produit) use ($stockByProduit) {
+				return [
+					'id' => $produit->id,
+					'name' => $produit->name,
+					'prix_achat' => $produit->prix_achat,
+					'prix_vente' => $produit->prix_vente,
+					'code_barre' => $produit->code_barre,
+					'quantite' => (int) ($stockByProduit[$produit->id] ?? 0),
+					'stock' => (int) ($stockByProduit[$produit->id] ?? 0),
+				];
+			});
 		$categories = ProductCategory::orderBy('name')->get(['id', 'name']);
 		$fournisseurs = Fournisseur::orderBy('name')->get(['id', 'name']);
 

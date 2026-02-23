@@ -80,6 +80,9 @@ export default function ProduitsIndex({
     prix_max: filters.prix_max ?? '',
   });
   const [activeThumb, setActiveThumb] = useState<'min' | 'max' | null>(null);
+  const [minInputDraft, setMinInputDraft] = useState<string | null>(null);
+  const [maxInputDraft, setMaxInputDraft] = useState<string | null>(null);
+  const [activeFilterField, setActiveFilterField] = useState<'category' | 'fournisseur' | null>(null);
   const didMount = useRef(false);
 
   const isSameFilters = (left: typeof filterState, right: typeof filterState) =>
@@ -123,6 +126,11 @@ export default function ProduitsIndex({
       didMount.current = true;
       return;
     }
+
+    if (activeFilterField === 'category' || activeFilterField === 'fournisseur') {
+      return;
+    }
+
     if (isSameFilters(filterState, {
       name: filters.name ?? '',
       code_barre: filters.code_barre ?? '',
@@ -138,7 +146,15 @@ export default function ProduitsIndex({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [filterState]);
+  }, [filterState, activeFilterField]);
+
+  const submitFilters = (nextFilters: typeof filterState) => {
+    router.get('/produits', nextFilters, {
+      preserveState: true,
+      replace: true,
+      preserveScroll: true,
+    });
+  };
 
   const resetFilters = () => {
     const cleared = {
@@ -156,13 +172,81 @@ export default function ProduitsIndex({
   const priceMinBound = Number.isFinite(priceMin) ? Math.floor(priceMin) : 0;
   const priceMaxBound = Number.isFinite(priceMax) ? Math.ceil(priceMax) : 0;
   const safeMaxBound = priceMaxBound > priceMinBound ? priceMaxBound : priceMinBound + 1;
-  const currentMin = filterState.prix_min !== '' ? Number(filterState.prix_min) : priceMinBound;
-  const currentMax = filterState.prix_max !== '' ? Number(filterState.prix_max) : safeMaxBound;
-  const clampedMin = Math.min(currentMin, currentMax);
-  const clampedMax = Math.max(currentMax, currentMin);
+  const parsedMin = filterState.prix_min !== '' ? Number(filterState.prix_min) : priceMinBound;
+  const parsedMax = filterState.prix_max !== '' ? Number(filterState.prix_max) : safeMaxBound;
+  const currentMin = Number.isFinite(parsedMin) ? parsedMin : priceMinBound;
+  const currentMax = Number.isFinite(parsedMax) ? parsedMax : safeMaxBound;
+  const boundedMin = Math.max(priceMinBound, Math.min(currentMin, safeMaxBound));
+  const boundedMax = Math.max(priceMinBound, Math.min(currentMax, safeMaxBound));
+  const clampedMin = boundedMin;
+  const clampedMax = Math.max(boundedMax, boundedMin);
   const rangeSpan = safeMaxBound - priceMinBound || 1;
   const minPercent = ((clampedMin - priceMinBound) / rangeSpan) * 100;
   const maxPercent = ((clampedMax - priceMinBound) / rangeSpan) * 100;
+
+  const normalizeMinValue = (raw: number, currentMaxRaw: number) => {
+    const currentMaxNormalized = Number.isFinite(currentMaxRaw)
+      ? Math.max(priceMinBound, Math.min(currentMaxRaw, safeMaxBound))
+      : safeMaxBound;
+
+    const minNormalized = Number.isFinite(raw)
+      ? Math.max(priceMinBound, Math.min(raw, currentMaxNormalized))
+      : priceMinBound;
+
+    return {
+      min: minNormalized,
+      max: Math.max(currentMaxNormalized, minNormalized),
+    };
+  };
+
+  const normalizeMaxValue = (raw: number, currentMinRaw: number) => {
+    const currentMinNormalized = Number.isFinite(currentMinRaw)
+      ? Math.max(priceMinBound, Math.min(currentMinRaw, safeMaxBound))
+      : priceMinBound;
+
+    const maxNormalized = Number.isFinite(raw)
+      ? Math.max(currentMinNormalized, Math.min(raw, safeMaxBound))
+      : safeMaxBound;
+
+    return {
+      min: currentMinNormalized,
+      max: maxNormalized,
+    };
+  };
+
+  const commitMinDraftValue = () => {
+    setFilterState((prev) => {
+      const draftSource = minInputDraft ?? prev.prix_min ?? String(priceMinBound);
+      const draftRaw = Number(draftSource);
+      const currentMinRaw = Number.isFinite(draftRaw) ? draftRaw : priceMinBound;
+      const currentMaxRaw = Number(prev.prix_max || safeMaxBound);
+      const next = normalizeMinValue(currentMinRaw, currentMaxRaw);
+
+      return {
+        ...prev,
+        prix_min: String(next.min),
+        prix_max: String(next.max),
+      };
+    });
+    setMinInputDraft(null);
+  };
+
+  const commitMaxDraftValue = () => {
+    setFilterState((prev) => {
+      const draftSource = maxInputDraft ?? prev.prix_max ?? String(safeMaxBound);
+      const draftRaw = Number(draftSource);
+      const currentMaxRaw = Number.isFinite(draftRaw) ? draftRaw : safeMaxBound;
+      const currentMinRaw = Number(prev.prix_min || priceMinBound);
+      const next = normalizeMaxValue(currentMaxRaw, currentMinRaw);
+
+      return {
+        ...prev,
+        prix_min: String(next.min),
+        prix_max: String(next.max),
+      };
+    });
+    setMaxInputDraft(null);
+  };
 
   return (
     <AppLayout>
@@ -276,6 +360,11 @@ export default function ProduitsIndex({
                       <Input
                         value={filterState.category}
                         onChange={(e) => setFilterState({ ...filterState, category: e.target.value })}
+                        onFocus={() => setActiveFilterField('category')}
+                        onBlur={() => {
+                          setActiveFilterField(null);
+                          submitFilters({ ...filterState });
+                        }}
                         placeholder="Catégorie"
                         list="categorie-options"
                       />
@@ -290,6 +379,11 @@ export default function ProduitsIndex({
                       <Input
                         value={filterState.fournisseur}
                         onChange={(e) => setFilterState({ ...filterState, fournisseur: e.target.value })}
+                        onFocus={() => setActiveFilterField('fournisseur')}
+                        onBlur={() => {
+                          setActiveFilterField(null);
+                          submitFilters({ ...filterState });
+                        }}
                         placeholder="Fournisseur"
                         list="fournisseur-options"
                       />
@@ -320,15 +414,20 @@ export default function ProduitsIndex({
                               type="number"
                               min={priceMinBound}
                               max={safeMaxBound}
-                              value={clampedMin}
-                              onFocus={() => setActiveThumb('min')}
+                              value={minInputDraft ?? String(clampedMin)}
+                              onFocus={() => {
+                                setActiveThumb('min');
+                                setMinInputDraft(String(clampedMin));
+                              }}
+                              onBlur={commitMinDraftValue}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  commitMinDraftValue();
+                                }
+                              }}
                               onChange={(e) => {
-                                const nextValue = Math.min(Number(e.target.value || 0), clampedMax);
-                                setFilterState({
-                                  ...filterState,
-                                  prix_min: String(nextValue),
-                                  prix_max: String(clampedMax),
-                                });
+                                setMinInputDraft(e.target.value);
                               }}
                               className="h-5 w-14 bg-transparent text-right text-[11px] font-semibold text-black outline-none"
                             />
@@ -344,15 +443,20 @@ export default function ProduitsIndex({
                               type="number"
                               min={priceMinBound}
                               max={safeMaxBound}
-                              value={clampedMax}
-                              onFocus={() => setActiveThumb('max')}
+                              value={maxInputDraft ?? String(clampedMax)}
+                              onFocus={() => {
+                                setActiveThumb('max');
+                                setMaxInputDraft(String(clampedMax));
+                              }}
+                              onBlur={commitMaxDraftValue}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  commitMaxDraftValue();
+                                }
+                              }}
                               onChange={(e) => {
-                                const nextValue = Math.max(Number(e.target.value || 0), clampedMin);
-                                setFilterState({
-                                  ...filterState,
-                                  prix_min: String(clampedMin),
-                                  prix_max: String(nextValue),
-                                });
+                                setMaxInputDraft(e.target.value);
                               }}
                               className="h-5 w-14 bg-transparent text-right text-[11px] font-semibold text-black outline-none"
                             />
@@ -368,11 +472,16 @@ export default function ProduitsIndex({
                           value={clampedMin}
                           onPointerDown={() => setActiveThumb('min')}
                           onChange={(e) => {
-                            const nextMin = Math.min(Number(e.target.value), clampedMax);
-                            setFilterState({
-                              ...filterState,
-                              prix_min: String(nextMin),
-                              prix_max: String(clampedMax),
+                            const inputRaw = Number(e.target.value);
+                            setFilterState((prev) => {
+                              const currentMaxRaw = Number(prev.prix_max || safeMaxBound);
+                              const next = normalizeMinValue(inputRaw, currentMaxRaw);
+
+                              return {
+                                ...prev,
+                                prix_min: String(next.min),
+                                prix_max: String(next.max),
+                              };
                             });
                           }}
                           className={`absolute inset-0 w-full appearance-none bg-transparent accent-white pointer-events-none ${
@@ -392,11 +501,16 @@ export default function ProduitsIndex({
                           value={clampedMax}
                           onPointerDown={() => setActiveThumb('max')}
                           onChange={(e) => {
-                            const nextMax = Math.max(Number(e.target.value), clampedMin);
-                            setFilterState({
-                              ...filterState,
-                              prix_min: String(clampedMin),
-                              prix_max: String(nextMax),
+                            const inputRaw = Number(e.target.value);
+                            setFilterState((prev) => {
+                              const currentMinRaw = Number(prev.prix_min || priceMinBound);
+                              const next = normalizeMaxValue(inputRaw, currentMinRaw);
+
+                              return {
+                                ...prev,
+                                prix_min: String(next.min),
+                                prix_max: String(next.max),
+                              };
                             });
                           }}
                           className={`absolute inset-0 w-full appearance-none bg-transparent accent-white pointer-events-none ${

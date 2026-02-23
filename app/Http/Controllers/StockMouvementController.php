@@ -157,7 +157,7 @@ class StockMouvementController extends Controller
             ->get(['produits.id', 'produits.name', 'stocks.quantite']);
 
         $produitsByChantier = [];
-        if ($isChef && $originChantiers->isNotEmpty()) {
+        if ($originChantiers->isNotEmpty()) {
             $rows = Stock::query()
                 ->join('produits', 'produits.id', '=', 'stocks.produit_id')
                 ->where('stocks.location_type', 'chantier')
