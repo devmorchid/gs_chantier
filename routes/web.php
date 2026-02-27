@@ -21,9 +21,31 @@ use Laravel\Fortify\Features;
 use BaconQrCode\Renderer\Image\PngRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Renderer\Image\GdImageBackEnd;
+use Illuminate\Support\Facades\Storage;
 use BaconQrCode\Writer;
 
 use App\Models\Cheque;
+// Route to serve achat paiement justificatif
+Route::get('achats/paiements/file/{path}', function ($path) {
+    $file = Storage::disk('public')->path('paiements_achats/' . $path);
+    if (!file_exists($file)) abort(404);
+    $mime = mime_content_type($file);
+    return response()->file($file, [
+        'Content-Type' => $mime,
+        'Content-Disposition' => 'inline; filename="' . basename($file) . '"',
+    ]);
+})->where('path', '.*')->name('achats.paiements.file');
+
+// Route to serve vente paiement justificatif (if needed)
+Route::get('ventes/paiements/file/{path}', function ($path) {
+    $file = Storage::disk('public')->path('paiements_ventes/' . $path);
+    if (!file_exists($file)) abort(404);
+    $mime = mime_content_type($file);
+    return response()->file($file, [
+        'Content-Type' => $mime,
+        'Content-Disposition' => 'inline; filename="' . basename($file) . '"',
+    ]);
+})->where('path', '.*')->name('ventes.paiements.file');
 
 Route::get('/test-qr', function() {
     $renderer = new PngRenderer(
@@ -147,9 +169,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('product-categories', \App\Http\Controllers\ProductCategoryController::class)->except(['show']);
         Route::resource('fournisseurs', \App\Http\Controllers\FournisseurController::class);
         Route::resource('achats', \App\Http\Controllers\AchatController::class)->only(['index', 'create', 'store', 'show']);
+        Route::post('achats/{achat}/paiement', [\App\Http\Controllers\AchatController::class, 'paiement'])->name('achats.paiement');
         Route::get('achats/{achat}/pdf', [\App\Http\Controllers\AchatController::class, 'pdf'])
             ->name('achats.pdf');
         Route::resource('ventes', VenteController::class)->only(['index', 'create', 'store', 'show']);
+            Route::post('ventes/{vente}/paiement', [VenteController::class, 'paiement'])->name('ventes.paiement');
         Route::get('ventes/{vente}/pdf', [VenteController::class, 'pdf'])
             ->name('ventes.pdf');
     });
@@ -308,3 +332,7 @@ Route::middleware(['auth', 'verified', 'role:technicien'])->group(function () {
     Route::get('mon-pointage', [TechnicienPointageController::class, 'index'])->name('technicien.pointage');
     Route::post('mon-pointage', [TechnicienPointageController::class, 'store']);
 });
+
+
+// Statistiques dashboard
+Route::middleware(['auth', 'verified', 'role:admin|chef_chantier'])->get('statistiques', [\App\Http\Controllers\StatistiquesController::class, 'index'])->name('statistiques.index');

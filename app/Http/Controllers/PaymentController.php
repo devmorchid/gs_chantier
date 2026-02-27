@@ -19,10 +19,19 @@ class PaymentController extends Controller
             'cheque_number' => 'nullable|string',
             'payment_date' => 'required|date',
             'notes' => 'nullable|string',
+            'file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp|max:4096',
         ]);
 
-        DB::transaction(function () use ($facture, $data) {
-            $payment = Payment::create(array_merge($data, ['facture_id' => $facture->id]));
+        DB::transaction(function () use ($facture, $data, $request) {
+            $paymentData = array_merge($data, [
+                'facture_id' => $facture->id,
+                'user_id' => $request->user()->id,
+            ]);
+            if ($request->hasFile('file')) {
+                $path = $request->file('file')->store('paiements', 'public');
+                $paymentData['file'] = $path;
+            }
+            $payment = Payment::create($paymentData);
 
             // Si payment_method = cheque, enregistrer dans cheques
             if ($data['payment_method'] === 'cheque') {
@@ -34,7 +43,7 @@ class PaymentController extends Controller
                     'cheque_number' => $data['cheque_number'] ?? '',
                     'amount' => $data['amount'],
                     'issue_date' => $data['payment_date'],
-                    'due_date' => $data['payment_date'], // Peut être modifié chسب الحاجة
+                    'due_date' => $data['payment_date'],
                     'status' => 'en_attente',
                 ]);
             }

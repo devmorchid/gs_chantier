@@ -16,8 +16,20 @@ export interface Vente {
   total_ht?: number;
   total_tva?: number;
   total_ttc?: number;
+  montant_paye?: number;
+  reste_a_payer?: number;
   notes?: string | null;
   items?: VenteItem[];
+  paiements?: Paiement[];
+}
+
+export interface Paiement {
+  id: number;
+  montant: number;
+  mode_paiement: string;
+  date_paiement: string;
+  file?: string | null;
+  user?: string | null;
 }
 
 export interface PaginatedVentes {

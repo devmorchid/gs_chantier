@@ -33,7 +33,7 @@ class Facture extends Model
         'bon_commande',
         'bon_commande_path',
         'status',
-        'notes',
+        'notes_internes',
     ];
 
     protected $casts = [

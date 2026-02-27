@@ -9,6 +9,11 @@ class Vente extends Model
 {
     use HasFactory;
 
+    public function suivieVentes()
+    {
+        return $this->hasMany(SuivieVente::class);
+    }
+
     protected $fillable = [
         'reference',
         'user_id',
@@ -20,6 +25,8 @@ class Vente extends Model
         'total_tva',
         'total_ttc',
         'notes',
+        // 'montant_paye',
+        // 'reste_a_payer',
     ];
 
     protected $casts = [

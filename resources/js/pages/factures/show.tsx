@@ -69,6 +69,8 @@ interface Payment {
     cheque_number?: string | null;
     reference?: string | null;
     notes?: string | null;
+    file?: string | null;
+    user_id?: number | null;
 }
 
 interface FactureItem {
@@ -149,6 +151,7 @@ export default function FactureShow({ facture, statuts, modesPaiement }: Props) 
         reference?: string;
         payment_date?: string;
         notes?: string;
+        file?: File | null;
     }>({
         montant: facture.reste_a_payer,
         mode_paiement: facture.mode_paiement || '',
@@ -157,6 +160,7 @@ export default function FactureShow({ facture, statuts, modesPaiement }: Props) 
         reference: '',
         payment_date: '',
         notes: '',
+        file: null,
     });
 
     const [paymentMethod, setPaymentMethod] = useState(paiementForm.data.mode_paiement || '');
@@ -181,10 +185,32 @@ export default function FactureShow({ facture, statuts, modesPaiement }: Props) 
 
     const handlePaiement = (e: React.FormEvent) => {
         e.preventDefault();
+        const formData = new FormData();
+        formData.append('amount', paiementForm.data.montant.toString());
+        formData.append('payment_method', paiementForm.data.mode_paiement);
+        if (paiementForm.data.cheque_number) formData.append('cheque_number', paiementForm.data.cheque_number);
+        if (paiementForm.data.bank_name) formData.append('bank_name', paiementForm.data.bank_name);
+        if (paiementForm.data.reference) formData.append('reference', paiementForm.data.reference);
+        if (paiementForm.data.payment_date) formData.append('payment_date', paiementForm.data.payment_date);
+        if (paiementForm.data.notes) formData.append('notes', paiementForm.data.notes);
+        if (paiementForm.data.file) formData.append('file', paiementForm.data.file);
         paiementForm.post(`/factures/${facture.id}/paiement`, {
             onSuccess: () => setShowPaiementDialog(false),
+            forceFormData: true,
+            data: formData,
         });
     };
+                                                        <div className="space-y-1">
+                                                            <Label htmlFor="file" className="font-medium text-gray-700">Justificatif (PDF ou image)</Label>
+                                                            <Input
+                                                                id="file"
+                                                                type="file"
+                                                                accept=".pdf,image/*"
+                                                                onChange={e => paiementForm.setData('file', e.target.files?.[0] ?? null)}
+                                                                className="bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                                                            />
+                                                            {paiementForm.errors.file && <div className="text-red-600 text-xs mt-1">{paiementForm.errors.file}</div>}
+                                                        </div>
 
     const getStatusBadgeClass = (color: string) => {
         switch (color) {

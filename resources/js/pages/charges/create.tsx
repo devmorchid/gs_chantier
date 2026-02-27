@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { ArrowLeft, FileText, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -35,13 +36,13 @@ interface ChargeForm {
 }
 
 export default function ChargesCreate({ statuts, types, chantiers, requiresChantier, isAdmin }: Props) {
-  const paymentOptions = [
-    { value: 'especes', label: 'Especes' },
-    { value: 'virement', label: 'Virement bancaire' },
-    { value: 'cheque', label: 'Cheque' },
-    { value: 'carte', label: 'Carte bancaire' },
-    { value: 'autre', label: 'Autre' },
-  ];
+  const modesPaiement: Record<string, string> = {
+    espece: 'Espèces',
+    cheque: 'Chèque',
+    virement: 'Virement',
+    carte: 'Carte bancaire',
+    autre: 'Autre',
+  };
 
   const [filePreviews, setFilePreviews] = useState<Array<{
     key: string;
@@ -207,20 +208,17 @@ export default function ChargesCreate({ statuts, types, chantiers, requiresChant
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="font-medium">Methode de paiement</label>
+                    <Label htmlFor="payment_method">Mode de paiement</Label>
                     <Select
-                      value={data.payment_method || 'none'}
-                      onValueChange={(value) => setData('payment_method', value === 'none' ? '' : value)}
+                      value={data.payment_method}
+                      onValueChange={(value) => setData('payment_method', value)}
                     >
                       <SelectTrigger className="w-full">
-                        {data.payment_method
-                          ? (paymentOptions.find((option) => option.value === data.payment_method)?.label ?? 'Methode')
-                          : 'Selectionner une methode'}
+                        <SelectValue placeholder="Sélectionnez" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">Non defini</SelectItem>
-                        {paymentOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        {Object.entries(modesPaiement).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

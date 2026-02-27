@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import MultiStepConfirmation from '@/components/ui/multi-step-confirmation';
 import { Link, useForm, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,6 +65,12 @@ interface AchatForm {
   remise: string;
   tva_rate: string;
   notes: string;
+  mode_paiement: string;
+  montant_paye: string;
+  cheque_numero: string;
+  cheque_banque: string;
+  cheque_echeance: string;
+  cheque_titulaire: string;
   items: AchatItemForm[];
 }
 
@@ -101,6 +108,12 @@ export default function AchatsCreate({ produits, categories, fournisseurs }: Pro
     remise: '0',
     tva_rate: '0',
     notes: '',
+    mode_paiement: '',
+    montant_paye: '',
+    cheque_numero: '',
+    cheque_banque: '',
+    cheque_echeance: '',
+    cheque_titulaire: '',
     items: [
       {
         mode: 'existing',
@@ -294,6 +307,12 @@ export default function AchatsCreate({ produits, categories, fournisseurs }: Pro
   const totalApresRemise = Math.max(totalHt - remiseValue, 0);
   const totalTva = totalApresRemise * (tvaRate / 100);
   const totalTtc = totalApresRemise + totalTva;
+  useEffect(() => {
+    // Set montant_paye to totalTtc if not manually changed
+    if (!data.montant_paye) {
+      setData('montant_paye', totalTtc.toFixed(2));
+    }
+  }, [totalTtc]);
 
   return (
     <AppLayout>
@@ -315,6 +334,7 @@ export default function AchatsCreate({ produits, categories, fournisseurs }: Pro
               <CardDescription>Renseignez les informations de l'achat</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
+                    {/* Montant payé field removed as requested */}
               <div className="space-y-2">
                 <label className="font-medium">Date <span className="text-destructive">*</span></label>
                 <Input type="date" value={data.date} onChange={(e) => setData('date', e.target.value)} required />
@@ -322,6 +342,7 @@ export default function AchatsCreate({ produits, categories, fournisseurs }: Pro
               </div>
               <div className="space-y-2">
                 <label className="font-medium">Fournisseur</label>
+                <label className="font-medium">Fournisseur <span className="text-destructive">*</span></label>
                 <Input
                   value={data.fournisseur_name}
                   onChange={(e) => {
@@ -332,6 +353,7 @@ export default function AchatsCreate({ produits, categories, fournisseurs }: Pro
                   }}
                   placeholder="Nom du fournisseur"
                   list="fournisseurs-options"
+                  required
                 />
                 <datalist id="fournisseurs-options">
                   {fournisseurs.map((f) => (
@@ -394,6 +416,7 @@ export default function AchatsCreate({ produits, categories, fournisseurs }: Pro
                 <label className="font-medium">TVA (%)</label>
                 <Input type="number" min="0" step="0.01" value={data.tva_rate} onChange={(e) => setData('tva_rate', e.target.value)} />
               </div>
+              {/* Méthode de paiement field removed as requested */}
               <div className="space-y-2 md:col-span-2">
                 <label className="font-medium">Notes</label>
                 <Input value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Notes..." />
@@ -689,107 +712,20 @@ export default function AchatsCreate({ produits, categories, fournisseurs }: Pro
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmer l'achat</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="max-h-[70vh] space-y-5 overflow-y-auto pr-1 text-sm text-muted-foreground">
-                <p>Vérifiez les informations de l'achat avant de confirmer.</p>
-
-                <div className="grid gap-4 rounded-lg border bg-muted/40 p-4">
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="space-y-1">
-                      <p className="text-xs uppercase tracking-wide">Date</p>
-                      <p className="font-medium text-foreground">{data.date || '-'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs uppercase tracking-wide">Fournisseur</p>
-                      <p className="font-medium text-foreground">{data.fournisseur_name || '-'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs uppercase tracking-wide">Remise</p>
-                      <p className="font-medium text-foreground">{formatValue(parseNumber(data.remise))} DH</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs uppercase tracking-wide">TVA</p>
-                      <p className="font-medium text-foreground">{formatValue(parseNumber(data.tva_rate))} %</p>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-wide">Notes</p>
-                    <p className="font-medium text-foreground">{data.notes?.trim() || '-'}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold text-foreground">Produits</p>
-                    <span className="text-xs">{data.items.length} ligne(s)</span>
-                  </div>
-                  <div className="overflow-hidden rounded-lg border">
-                    <div className="grid grid-cols-12 gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-semibold text-foreground">
-                      <span className="col-span-5">Produit</span>
-                      <span className="col-span-2 text-right">Quantite</span>
-                      <span className="col-span-2 text-right">Prix d'achat</span>
-                      <span className="col-span-3 text-right">Total</span>
-                    </div>
-                    <div className="divide-y">
-                      {data.items.map((item, index) => {
-                        const label = item.mode === 'existing'
-                          ? (item.produit_name || 'Produit non choisi')
-                          : (item.new_produit.name || 'Nouveau produit');
-                        const lineTotal = getLineTotal(item);
-                        const prixAchat = parseNumber(item.prix_achat);
-                        const prixVente = item.mode === 'new' ? parseNumber(item.new_produit.prix_vente) : null;
-                        const profitPct = item.mode === 'new' ? parseNumber(item.new_produit.profit_pct) : null;
-
-                        return (
-                          <div key={`${item.mode}-${index}`} className="grid grid-cols-12 gap-2 px-3 py-3">
-                            <div className="col-span-5 space-y-1">
-                              <p className="font-medium text-foreground">{label}</p>
-                              <p className="text-xs">Mode : {item.mode === 'existing' ? 'Produit existant' : 'Nouveau produit'}</p>
-                              {item.mode === 'new' && (
-                                <div className="space-y-1 text-xs">
-                                  <p>Code barre : {item.new_produit.code_barre || '-'}</p>
-                                  <p>Categorie : {item.new_produit.category_name || '-'}</p>
-                                  <p>Fournisseur : {item.new_produit.fournisseur_name || '-'}</p>
-                                  <p>Prix de vente : {formatValue(prixVente)} DH</p>
-                                  <p>Profit : {formatValue(profitPct)} %</p>
-                                </div>
-                              )}
-                            </div>
-                            <div className="col-span-2 text-right font-medium text-foreground">{item.quantite}</div>
-                            <div className="col-span-2 text-right font-medium text-foreground">{formatValue(prixAchat)} DH</div>
-                            <div className="col-span-3 text-right font-semibold text-foreground">{formatValue(lineTotal)} DH</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-2 rounded-lg border bg-muted/40 p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Total HT</span>
-                    <span className="font-medium text-foreground">{formatValue(totalHt)} DH</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Total apres remise</span>
-                    <span className="font-medium text-foreground">{formatValue(totalApresRemise)} DH</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span>TVA</span>
-                    <span className="font-medium text-foreground">{formatValue(totalTva)} DH</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Total TTC</span>
-                    <span className="text-base font-semibold text-foreground">{formatValue(totalTtc)} DH</span>
-                  </div>
-                </div>
-              </div>
-            </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSubmit}>Confirmer</AlertDialogAction>
-          </AlertDialogFooter>
+          <AlertDialogDescription>
+            <MultiStepConfirmation
+              data={data}
+              errors={errors}
+              setData={setData}
+              totalHt={totalHt}
+              totalApresRemise={totalApresRemise}
+              totalTva={totalTva}
+              totalTtc={totalTtc}
+              onConfirm={handleConfirmSubmit}
+              onCancel={() => setConfirmOpen(false)}
+            />
+          </AlertDialogDescription>
         </AlertDialogContent>
       </AlertDialog>
     </AppLayout>

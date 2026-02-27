@@ -2,21 +2,22 @@ import AppLayout from '@/layouts/app-layout';
 import { Link, router, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import VenteMultiStepConfirmation from '@/components/ui/vente-multi-step-confirmation';
 import { Input } from '@/components/ui/input';
 import { ProductAutocomplete } from '@/components/ui/product-autocomplete';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+const modesPaiement: Record<string, string> = {
+  espece: 'Espèces',
+  cheque: 'Chèque',
+  virement: 'Virement',
+  carte: 'Carte bancaire',
+  autre: 'Autre',
+};
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useEffect } from 'react';
 
 interface ProduitOption {
   id: number;
@@ -46,6 +47,8 @@ interface VenteForm {
   remise: string;
   tva_rate: string;
   notes: string;
+  mode_paiement: string;
+  montant_paye: string;
   items: VenteItemForm[];
 }
 
@@ -64,13 +67,10 @@ export default function VentesCreate({ produits, clients }: Props) {
     remise: '0',
     tva_rate: '0',
     notes: '',
+    mode_paiement: '',
+    montant_paye: '',
     items: [
-      {
-        produit_id: '',
-        produit_name: '',
-        quantite: 1,
-        prix_vente: '',
-      },
+      { produit_id: '', produit_name: '', quantite: 1, prix_vente: '' },
     ],
   });
 
@@ -179,6 +179,12 @@ export default function VentesCreate({ produits, clients }: Props) {
   const totalApresRemise = Math.max(totalHt - remiseValue, 0);
   const totalTva = totalApresRemise * (tvaRate / 100);
   const totalTtc = totalApresRemise + totalTva;
+  useEffect(() => {
+    // Set montant_paye to totalTtc if not manually changed
+    if (!data.montant_paye) {
+      setData('montant_paye', totalTtc.toFixed(2));
+    }
+  }, [totalTtc]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,10 +198,6 @@ export default function VentesCreate({ produits, clients }: Props) {
     });
 
     setStockErrors(nextStockErrors);
-    if (Object.keys(nextStockErrors).length > 0) {
-      return;
-    }
-
     setConfirmOpen(true);
   };
 
@@ -260,6 +262,7 @@ export default function VentesCreate({ produits, clients }: Props) {
                 <Input type="number" min="0" step="0.01" value={data.tva_rate} onChange={(e) => setData('tva_rate', e.target.value)} />
                 {errors.tva_rate && <p className="text-sm text-destructive">{errors.tva_rate}</p>}
               </div>
+              {/* Mode de paiement field removed from Informations générales. Now only in confirmation popup. */}
               <div className="space-y-2 md:col-span-2">
                 <label className="font-medium">Notes</label>
                 <Input value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Notes..." />
@@ -399,20 +402,21 @@ export default function VentesCreate({ produits, clients }: Props) {
         </form>
       </div>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer la vente</AlertDialogTitle>
-            <AlertDialogDescription>
-              Cette vente contient {data.items.length} produit(s) pour un total TTC de {totalTtc.toFixed(2)} DH.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSubmit}>Confirmer</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <VenteMultiStepConfirmation
+            data={data}
+            errors={errors}
+            setData={setData}
+            totalHt={totalHt}
+            totalApresRemise={totalApresRemise}
+            totalTva={totalTva}
+            totalTtc={totalTtc}
+            onConfirm={handleConfirmSubmit}
+            onCancel={() => setConfirmOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

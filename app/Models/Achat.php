@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Achat extends Model
 {
+        use HasFactory;
+
+        public function suivieAchats()
+        {
+            return $this->hasMany(SuivieAchat::class);
+        }
     use HasFactory;
 
     protected $fillable = [
@@ -20,6 +26,9 @@ class Achat extends Model
         'total_tva',
         'total_ttc',
         'notes',
+        'mode_paiement', // Added for saving payment method
+        // 'montant_paye',
+        // 'reste_a_payer',
     ];
 
     protected $casts = [

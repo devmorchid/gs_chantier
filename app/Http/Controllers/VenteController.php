@@ -96,6 +96,19 @@ class VenteController extends Controller
             'remise' => 'nullable|numeric|min:0',
             'tva_rate' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
+            'montant_paye' => 'required|numeric|min:0',
+            'mode_paiement' => 'nullable|string',
+            // Chèque fields for initial payment
+            'cheque_numero' => 'nullable|string',
+            'cheque_banque' => 'nullable|string',
+            'cheque_echeance' => 'nullable|date',
+            'cheque_titulaire' => 'nullable|string',
+            'cheque_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp',
+            // Virement fields for initial payment
+            'virement_reference' => 'nullable|string',
+            'virement_transfer_date' => 'nullable|date',
+            'virement_note' => 'nullable|string',
+            'virement_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp',
             'items' => 'required|array|min:1',
             'items.*.produit_id' => 'required|exists:produits,id',
             'items.*.quantite' => 'required|integer|min:1',
@@ -143,6 +156,16 @@ class VenteController extends Controller
         $totalTtc = $baseTva + $totalTva;
 
         DB::transaction(function () use ($request, $validated, $preparedItems, $totalHt, $remise, $tvaRate, $totalTva, $totalTtc) {
+            // Handle virement file upload if present
+            $virementFilePath = null;
+            if ($request->hasFile('virement_file')) {
+                $virementFilePath = $request->file('virement_file')->store('paiements_ventes', 'public');
+            }
+            // Handle cheque file upload if present
+            $chequeFilePath = null;
+            if ($request->hasFile('cheque_file')) {
+                $chequeFilePath = $request->file('cheque_file')->store('paiements_ventes', 'public');
+            }
             $vente = Vente::create([
                 'user_id' => $request->user()->id,
                 'client_id' => $validated['client_id'] ?? null,
@@ -154,6 +177,49 @@ class VenteController extends Controller
                 'total_ttc' => $totalTtc,
                 'notes' => $validated['notes'] ?? null,
             ]);
+
+            // Save initial payment in suivie_vente
+            if ($validated['montant_paye'] > 0) {
+                $mode = $validated['mode_paiement'] ?? 'initial';
+                $vente->suivieVentes()->create([
+                    'user_id' => $request->user()->id,
+                    'montant' => $validated['montant_paye'],
+                    'mode_paiement' => $mode,
+                    'date_paiement' => now(),
+                    'file' => $mode === 'cheque' ? $chequeFilePath : ($mode === 'virement' ? $virementFilePath : null),
+                ]);
+                // Insert cheque if initial payment is by cheque
+                if ($mode === 'cheque') {
+                    \App\Models\Cheque::create([
+                        'direction' => 'in',
+                        'source_type' => 'vente',
+                        'source_id' => $vente->id,
+                        'bank_name' => $validated['cheque_banque'] ?? '',
+                        'cheque_number' => $validated['cheque_numero'] ?? '',
+                        'amount' => $validated['montant_paye'],
+                        'issue_date' => now()->toDateString(),
+                        'due_date' => $validated['cheque_echeance'] ?? now()->toDateString(),
+                        'status' => 'en_attente',
+                        'file' => $chequeFilePath,
+                        // Optionally store titulaire if you want
+                        // 'titulaire' => $validated['cheque_titulaire'] ?? '',
+                    ]);
+                }
+                // Insert virement if initial payment is by virement
+                if ($mode === 'virement') {
+                    \App\Models\Virement::create([
+                        'direction' => 'in',
+                        'source_type' => 'vente',
+                        'source_id' => $vente->id,
+                        'reference' => $validated['virement_reference'] ?? '',
+                        'amount' => $validated['montant_paye'],
+                        'transfer_date' => $validated['virement_transfer_date'] ?? now()->toDateString(),
+                        'status' => 'en_attente',
+                        'note' => $validated['virement_note'] ?? '',
+                        // 'file' => $virementFilePath, // Do NOT store file in virements table
+                    ]);
+                }
+            }
 
             $vente->items()->createMany($preparedItems);
 
@@ -177,7 +243,10 @@ class VenteController extends Controller
 
     public function show(Vente $vente)
     {
-        $vente->load(['client:id,nom', 'user:id,name', 'items.produit:id,name']);
+        $vente->load(['client:id,nom', 'user:id,name', 'items.produit:id,name', 'suivieVentes.user:id,name']);
+
+        $totalPaye = $vente->suivieVentes->sum('montant');
+        $resteAPayer = max($vente->total_ttc - $totalPaye, 0);
 
         return Inertia::render('ventes/show', [
             'vente' => [
@@ -191,6 +260,8 @@ class VenteController extends Controller
                 'total_ht' => (float) $vente->total_ht,
                 'total_tva' => (float) $vente->total_tva,
                 'total_ttc' => (float) $vente->total_ttc,
+                'montant_paye' => (float) $totalPaye,
+                'reste_a_payer' => (float) $resteAPayer,
                 'notes' => $vente->notes,
                 'items' => $vente->items->map(fn (VenteItem $item) => [
                     'id' => $item->id,
@@ -198,8 +269,59 @@ class VenteController extends Controller
                     'quantite' => $item->quantite,
                     'prix_vente' => (float) $item->prix_vente,
                 ]),
+                'paiements' => $vente->suivieVentes->map(fn ($p) => [
+                    'id' => $p->id,
+                    'montant' => (float) $p->montant,
+                    'mode_paiement' => $p->mode_paiement,
+                    'date_paiement' => $p->date_paiement ? \Carbon\Carbon::parse($p->date_paiement)->format('d/m/Y H:i') : null,
+                    'file' => $p->file,
+                    'user' => $p->user?->name,
+                ]),
             ],
         ]);
+
+    }
+
+    public function paiement(Request $request, Vente $vente)
+    {
+        $validated = $request->validate([
+            'montant' => 'required|numeric|min:0.01',
+            'mode_paiement' => 'required|string',
+            'file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp',
+            // Chèque fields
+            'cheque_numero' => 'required|string',
+            'cheque_banque' => 'required|string',
+            'cheque_echeance' => 'required|date',
+            'cheque_titulaire' => 'required|string',
+        ]);
+        $filePath = null;
+        if ($request->hasFile('file')) {
+            $filePath = $request->file('file')->store('paiements_ventes', 'public');
+        }
+        $vente->suivieVentes()->create([
+            'user_id' => $request->user()->id,
+            'montant' => $validated['montant'],
+            'mode_paiement' => $validated['mode_paiement'],
+            'date_paiement' => now(),
+            'file' => $filePath,
+        ]);
+        // Si mode_paiement = cheque, enregistrer dans cheques
+        if ($validated['mode_paiement'] === 'cheque') {
+            \App\Models\Cheque::create([
+                'direction' => 'in', // vente = encaissement client
+                'source_type' => 'vente',
+                'source_id' => $vente->id,
+                'bank_name' => $validated['cheque_banque'] ?? '',
+                'cheque_number' => $validated['cheque_numero'] ?? '',
+                'amount' => $validated['montant'],
+                'issue_date' => now()->toDateString(),
+                'due_date' => $validated['cheque_echeance'] ?? now()->toDateString(),
+                'status' => 'en_attente',
+                // Optionally store titulaire if you want
+                // 'titulaire' => $validated['cheque_titulaire'] ?? '',
+            ]);
+        }
+        return redirect()->route('ventes.show', $vente->id)->with('success', 'Paiement enregistré.');
     }
 
     public function pdf(Vente $vente)
