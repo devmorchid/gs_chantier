@@ -75,4 +75,16 @@ class Achat extends Model
     {
         return $this->hasMany(AchatItem::class);
     }
+
+    public const STATUTS = [
+        'en_attente' => 'En attente',
+        'partiel' => 'Payé partiellement',
+        'paye' => 'Payé',
+        'annule' => 'Annulé',
+    ];
+
+    public function getStatutLabelAttribute(): string
+    {
+        return self::STATUTS[$this->statut] ?? $this->statut;
+    }
 }

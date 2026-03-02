@@ -19,7 +19,7 @@ class AchatController extends Controller
 {
 	public function index(Request $request)
 	{
-		$filters = $request->only(['reference', 'fournisseur', 'date_from', 'date_to']);
+		$filters = $request->only(['reference', 'fournisseur', 'date_from', 'date_to', 'statut']);
 
 		$query = Achat::query()
 			->with(['fournisseur:id,name', 'user:id,name'])
@@ -37,6 +37,9 @@ class AchatController extends Controller
 			->when($filters['date_to'] ?? null, function ($q, $to) {
 				$q->whereDate('date', '<=', $to);
 			})
+			->when($filters['statut'] ?? null, function ($q, $statut) {
+				$q->where('statut', $statut);
+			})
 			->orderByDesc('date');
 
 		$achats = $query->paginate(20)->withQueryString();
@@ -47,6 +50,7 @@ class AchatController extends Controller
 			'fournisseur' => $achat->fournisseur?->name,
 			'user' => $achat->user?->name,
 			'total_ttc' => (float) $achat->total_ttc,
+			'statut' => $achat->statut,
 		]);
 
 		$fournisseurOptions = Fournisseur::orderBy('name')->pluck('name');
@@ -55,6 +59,7 @@ class AchatController extends Controller
 			'achats' => $achats,
 			'filters' => $filters,
 			'fournisseurOptions' => $fournisseurOptions,
+			'statuts' => \App\Models\Achat::STATUTS,
 		]);
 	}
 
@@ -315,12 +320,16 @@ class AchatController extends Controller
 		$validated = $request->validate([
 			'montant' => 'required|numeric|min:0.01',
 			'mode_paiement' => 'required|string',
-			'file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp',
-			// Chèque fields
-			'cheque_numero' => 'nullable|string',
-			'cheque_banque' => 'nullable|string',
-			'cheque_echeance' => 'nullable|date',
-			'cheque_titulaire' => 'nullable|string',
+			   'file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp',
+			   // Chèque fields
+			   'cheque_numero' => 'nullable|string',
+			   'cheque_banque' => 'nullable|string',
+			   'cheque_echeance' => 'nullable|date',
+			   'cheque_titulaire' => 'nullable|string',
+			   // Virement fields
+			   'reference' => 'nullable|string',
+			   'virement_transfer_date' => 'nullable|date',
+			   'virement_note' => 'nullable|string',
 		]);
 		$montant = (float) $validated['montant'];
 		$filePath = null;
@@ -335,22 +344,48 @@ class AchatController extends Controller
 			'file' => $filePath,
 		]);
 
-		// Si mode_paiement = cheque, enregistrer dans cheques
-		if ($validated['mode_paiement'] === 'cheque') {
-			\App\Models\Cheque::create([
-				'direction' => 'out', // achat = paiement fournisseur
-				'source_type' => 'achat',
-				'source_id' => $achat->id,
-				'bank_name' => $validated['cheque_banque'] ?? '',
-				'cheque_number' => $validated['cheque_numero'] ?? '',
-				'amount' => $montant,
-				'issue_date' => now()->toDateString(),
-				'due_date' => $validated['cheque_echeance'] ?? now()->toDateString(),
-				'status' => 'en_attente',
-				// Optionally store titulaire if you want
-				// 'titulaire' => $validated['cheque_titulaire'] ?? '',
-			]);
+		// Mettre à jour le statut de l'achat selon le reste à payer
+		$achat->refresh();
+		$totalPaye = $achat->suivieAchats->sum('montant');
+		$reste = max((float)$achat->total_ttc - $totalPaye, 0);
+		if ($reste == 0) {
+			$achat->statut = 'paye';
+		} elseif ($totalPaye > 0) {
+			$achat->statut = 'partiel';
+		} else {
+			$achat->statut = 'en_attente';
 		}
+		$achat->save();
+
+			   // Si mode_paiement = cheque, enregistrer dans cheques (aligné avec store)
+			   if ($validated['mode_paiement'] === 'cheque') {
+				   \App\Models\Cheque::create([
+					   'direction' => 'out', // achat = paiement fournisseur
+					   'source_type' => 'achat',
+					   'source_id' => $achat->fournisseur_id, // aligné avec store()
+					   'bank_name' => $validated['cheque_banque'] ?? '',
+					   'cheque_number' => $validated['cheque_numero'] ?? '',
+					   'amount' => $montant,
+					   'issue_date' => now()->toDateString(),
+					   'due_date' => $validated['cheque_echeance'] ?? now()->toDateString(),
+					   'status' => 'en_attente',
+					   'titulaire' => $validated['cheque_titulaire'] ?? null,
+				   ]);
+			   }
+
+			   // Si mode_paiement = virement, enregistrer dans virements (aligné avec store)
+			   if ($validated['mode_paiement'] === 'virement') {
+				   \App\Models\Virement::create([
+					   'direction' => 'out',
+					   'source_type' => 'achat',
+					   'source_id' => $achat->id,
+					   'reference' => $validated['reference'] ?? '',
+					   'amount' => $montant,
+					   'transfer_date' => $validated['virement_transfer_date'] ?? now()->toDateString(),
+					   'status' => 'en_attente',
+					   'note' => $validated['virement_note'] ?? '',
+				   ]);
+			   }
 		return redirect()->route('achats.show', $achat->id)->with('success', 'Paiement enregistré.');
 	}
 

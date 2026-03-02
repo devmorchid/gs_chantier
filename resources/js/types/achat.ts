@@ -31,6 +31,7 @@ export interface Achat {
   notes?: string | null;
   items?: AchatItem[];
   paiements?: Paiement[];
+  statut?: string; // Added for status badge and filtering
 }
 
 export interface PaginatedAchats {

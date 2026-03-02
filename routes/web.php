@@ -334,5 +334,13 @@ Route::middleware(['auth', 'verified', 'role:technicien'])->group(function () {
 });
 
 
-// Statistiques dashboard
-Route::middleware(['auth', 'verified', 'role:admin|chef_chantier'])->get('statistiques', [\App\Http\Controllers\StatistiquesController::class, 'index'])->name('statistiques.index');
+// Statistiques dashboard & details
+Route::middleware(['auth', 'verified', 'role:admin|chef_chantier'])->group(function () {
+    Route::get('statistiques', [\App\Http\Controllers\StatistiquesController::class, 'index'])->name('statistiques.index');
+    Route::get('statistiques/chantiers', [\App\Http\Controllers\StatistiquesController::class, 'chantiers'])->name('statistiques.chantiers');
+    Route::get('statistiques/ventes', [\App\Http\Controllers\StatistiquesController::class, 'ventes'])->name('statistiques.ventes');
+    Route::get('statistiques/achats', [\App\Http\Controllers\StatistiquesController::class, 'achats'])->name('statistiques.achats');
+    Route::get('statistiques/paiements', [\App\Http\Controllers\StatistiquesController::class, 'paiements'])->name('statistiques.paiements');
+    Route::get('statistiques/clients', [\App\Http\Controllers\StatistiquesController::class, 'clients'])->name('statistiques.clients');
+    Route::get('statistiques/fournisseurs', [\App\Http\Controllers\StatistiquesController::class, 'fournisseurs'])->name('statistiques.fournisseurs');
+});

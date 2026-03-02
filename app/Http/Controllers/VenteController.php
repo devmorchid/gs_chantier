@@ -288,11 +288,11 @@ class VenteController extends Controller
             'montant' => 'required|numeric|min:0.01',
             'mode_paiement' => 'required|string',
             'file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,webp',
-            // Chèque fields
-            'cheque_numero' => 'required|string',
-            'cheque_banque' => 'required|string',
-            'cheque_echeance' => 'required|date',
-            'cheque_titulaire' => 'required|string',
+            // Chèque fields only required if mode_paiement is cheque
+            'cheque_numero' => 'required_if:mode_paiement,cheque|string',
+            'cheque_banque' => 'required_if:mode_paiement,cheque|string',
+            'cheque_echeance' => 'required_if:mode_paiement,cheque|date',
+            'cheque_titulaire' => 'required_if:mode_paiement,cheque|string',
         ]);
         $filePath = null;
         if ($request->hasFile('file')) {

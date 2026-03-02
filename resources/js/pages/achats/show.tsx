@@ -1,6 +1,5 @@
-
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -26,14 +25,55 @@ interface Props {
 export default function AchatsShow({ achat }: Props) {
   const [previewFile, setPreviewFile] = useState<{ url: string; type: string; name: string } | null>(null);
   const paiementProgress = achat.total_ttc && achat.total_ttc > 0 ? ((achat.montant_paye ?? 0) / achat.total_ttc) * 100 : 0;
-  const { data, setData, post, processing, reset, errors } = useForm<{ montant: string; mode_paiement: string; file: File | null }>({ montant: '', mode_paiement: '', file: null });
+  const { data, setData, post, processing, reset, errors } = useForm<{
+    montant: string;
+    mode_paiement: string;
+    file: File | null;
+    cheque_numero?: string;
+    cheque_banque?: string;
+    cheque_echeance?: string;
+    cheque_titulaire?: string;
+    virement_numero?: string;
+    virement_date?: string;
+    virement_note?: string;
+  }>({
+    montant: '',
+    mode_paiement: '',
+    file: null,
+    cheque_numero: '',
+    cheque_banque: '',
+    cheque_echeance: '',
+    cheque_titulaire: '',
+    virement_numero: '',
+    virement_date: '',
+    virement_note: '',
+  });
+  const [montantError, setMontantError] = useState<string>('');
+  const montantValid = (() => {
+    const v = parseFloat(data.montant);
+    if (isNaN(v) || v <= 0) return false;
+    if (achat.reste_a_payer !== undefined && v > achat.reste_a_payer) return false;
+    return true;
+  })();
   const handlePaiement = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!montantValid) {
+      setMontantError('Le montant doit être strictement supérieur à 0.');
+      return;
+    }
+    setMontantError('');
     const formData = new FormData();
     formData.append('montant', data.montant);
     formData.append('mode_paiement', data.mode_paiement);
     if (data.file) formData.append('file', data.file);
-    post(`/achats/${achat.id}/paiement`, formData);
+    if (data.cheque_numero) formData.append('cheque_numero', data.cheque_numero);
+    if (data.cheque_banque) formData.append('cheque_banque', data.cheque_banque);
+    if (data.cheque_echeance) formData.append('cheque_echeance', data.cheque_echeance);
+    if (data.cheque_titulaire) formData.append('cheque_titulaire', data.cheque_titulaire);
+    if (data.virement_numero) formData.append('reference', data.virement_numero);
+    if (data.virement_date) formData.append('virement_date', data.virement_date);
+    if (data.virement_note) formData.append('virement_note', data.virement_note);
+    router.post(`/achats/${achat.id}/paiement`, formData);
     // onSuccess can be handled via useEffect or after post if needed
   };
   return (
@@ -101,47 +141,62 @@ export default function AchatsShow({ achat }: Props) {
                 <div className="mt-4">
                   <h4 className="font-semibold mb-2">Historique des paiements</h4>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm border">
-                      <thead>
-                        <tr className="bg-muted">
-                          <th className="px-2 py-1 text-left">Montant</th>
-                          <th className="px-2 py-1 text-left">Mode</th>
-                          <th className="px-2 py-1 text-left">Date</th>
-                          <th className="px-2 py-1 text-left">Utilisateur</th>
-                          <th className="px-2 py-1 text-left">Fichier</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {achat.paiements.map(p => (
-                          <tr key={p.id}>
-                            <td className="px-2 py-1">{p.montant.toFixed(2)} DH</td>
-                            <td className="px-2 py-1">{p.mode_paiement}</td>
-                            <td className="px-2 py-1">{p.date_paiement}</td>
-                            <td className="px-2 py-1">{p.user ?? '-'}</td>
-                            <td className="px-2 py-1">
-                              {p.file ? (
-                                <div className="flex gap-2 items-center">
-                                  <Button size="icon" variant="ghost" type="button" onClick={() =>
-                                    p.file && setPreviewFile({
-                                      url: `/achats/paiements/file/${encodeURIComponent(p.file.replace('paiements_achats/', ''))}`,
-                                      type: p.file.endsWith('.pdf') ? 'application/pdf' : (p.file.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : ''),
-                                      name: p.file.split('/').pop() || 'Justificatif',
-                                    })
-                                  }>
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                  <Button asChild size="icon" variant="ghost">
-                                    <a href={`/achats/paiements/file/${encodeURIComponent(p.file.replace('paiements_achats/', ''))}`} target="_blank" rel="noreferrer">
-                                      <Download className="h-4 w-4" />
-                                    </a>
-                                  </Button>
-                                </div>
-                              ) : '-'}
-                            </td>
+                    <div
+                      style={{
+                        maxHeight: achat.paiements.length > 6 ? 320 : 'none',
+                        overflowY: achat.paiements.length > 6 ? 'auto' : 'visible',
+                        borderRadius: 12,
+                        border: '1px solid #e5e7eb',
+                        background: '#18181b',
+                        boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)',
+                      }}
+                      className="transition-all"
+                    >
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted sticky top-0 z-10">
+                            <th className="px-3 py-2 text-left font-semibold">Montant</th>
+                            <th className="px-3 py-2 text-left font-semibold">Mode</th>
+                            <th className="px-3 py-2 text-left font-semibold">Date</th>
+                            <th className="px-3 py-2 text-left font-semibold">Utilisateur</th>
+                            <th className="px-3 py-2 text-left font-semibold">Fichier</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {achat.paiements.map((p, i) => (
+                            <tr
+                              key={p.id}
+                              className={i % 2 === 0 ? 'bg-background' : 'bg-muted/40'}
+                            >
+                              <td className="px-3 py-2 font-medium">{p.montant.toFixed(2)} DH</td>
+                              <td className="px-3 py-2">{p.mode_paiement}</td>
+                              <td className="px-3 py-2">{p.date_paiement}</td>
+                              <td className="px-3 py-2">{p.user ?? '-'}</td>
+                              <td className="px-3 py-2">
+                                {p.file ? (
+                                  <div className="flex gap-2 items-center">
+                                    <Button size="icon" variant="ghost" type="button" onClick={() =>
+                                      p.file && setPreviewFile({
+                                        url: `/achats/paiements/file/${encodeURIComponent(p.file.replace('paiements_achats/', ''))}`,
+                                        type: p.file.endsWith('.pdf') ? 'application/pdf' : (p.file.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : ''),
+                                        name: p.file.split('/').pop() || 'Justificatif',
+                                      })
+                                    }>
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    <Button asChild size="icon" variant="ghost">
+                                      <a href={`/achats/paiements/file/${encodeURIComponent(p.file.replace('paiements_achats/', ''))}`} target="_blank" rel="noreferrer">
+                                        <Download className="h-4 w-4" />
+                                      </a>
+                                    </Button>
+                                  </div>
+                                ) : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}
@@ -167,13 +222,23 @@ export default function AchatsShow({ achat }: Props) {
                           onChange={e => {
                             const max = achat.reste_a_payer ?? 0;
                             let val = e.target.value;
-                            if (parseFloat(val) > max) val = max.toString();
+                            const num = parseFloat(val);
+                            if (num > max) val = max.toString();
                             setData('montant', val);
+                            if (val === '' || num <= 0) {
+                              setMontantError('Le montant doit être strictement supérieur à 0.');
+                            } else if (num > max) {
+                              setMontantError('Le montant ne peut pas dépasser le reste à payer.');
+                            } else {
+                              setMontantError('');
+                            }
                           }}
                           className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                           required
                         />
-                        {errors.montant && <div className="text-red-600 text-xs mt-1">{errors.montant}</div>}
+                        {(montantError || errors.montant) && (
+                          <div className="text-red-600 text-xs mt-1">{montantError || errors.montant}</div>
+                        )}
                       </div>
                       <div>
                         <label htmlFor="mode_paiement" className="block text-sm font-medium mb-1">Mode de paiement</label>
@@ -183,31 +248,150 @@ export default function AchatsShow({ achat }: Props) {
                           onChange={e => setData('mode_paiement', e.target.value)}
                           className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                           required
+                          onFocus={e => {
+                            const select = e.target as HTMLSelectElement;
+                            const option = select.querySelector('option[value=""]');
+                            if (option) (option as HTMLOptionElement).hidden = true;
+                          }}
                         >
-                          <option value="">Sélectionner</option>
+                          <option value="" disabled={!!data.mode_paiement}>Sélectionner</option>
                           <option value="espece">Espèce</option>
                           <option value="cheque">Chèque</option>
                           <option value="virement">Virement</option>
-                          <option value="autre">Autre</option>
                         </select>
                         {errors.mode_paiement && <div className="text-red-600 text-xs mt-1">{errors.mode_paiement}</div>}
                       </div>
-                      <div>
-                        <label htmlFor="file" className="block text-sm font-medium mb-1">Justificatif (PDF ou image)</label>
-                        <input
-                          id="file"
-                          type="file"
-                          accept="application/pdf,image/*"
-                          className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
-                          onChange={e => setData('file', e.target.files?.[0] ?? null)}
-                          required={data.mode_paiement === 'cheque' || data.mode_paiement === 'virement'}
-                        />
-                        {errors.file && <div className="text-red-600 text-xs mt-1">{errors.file}</div>}
-                      </div>
+                      {data.mode_paiement === 'cheque' && (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label htmlFor="cheque_numero" className="block text-sm font-medium mb-1">Numéro de chèque</label>
+                              <input
+                                id="cheque_numero"
+                                type="text"
+                                className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                value={data.cheque_numero || ''}
+                                onChange={e => setData('cheque_numero', e.target.value)}
+                              />
+                              {errors.cheque_numero && <div className="text-red-600 text-xs mt-1">{errors.cheque_numero}</div>}
+                            </div>
+                            <div>
+                              <label htmlFor="cheque_banque" className="block text-sm font-medium mb-1">Banque</label>
+                              <input
+                                id="cheque_banque"
+                                type="text"
+                                className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                value={data.cheque_banque || ''}
+                                onChange={e => setData('cheque_banque', e.target.value)}
+                              />
+                              {errors.cheque_banque && <div className="text-red-600 text-xs mt-1">{errors.cheque_banque}</div>}
+                            </div>
+                            <div>
+                              <label htmlFor="cheque_echeance" className="block text-sm font-medium mb-1">Date d'échéance</label>
+                              <input
+                                id="cheque_echeance"
+                                type="date"
+                                className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                value={data.cheque_echeance || ''}
+                                onChange={e => setData('cheque_echeance', e.target.value)}
+                              />
+                              {errors.cheque_echeance && <div className="text-red-600 text-xs mt-1">{errors.cheque_echeance}</div>}
+                            </div>
+                            <div>
+                              <label htmlFor="cheque_titulaire" className="block text-sm font-medium mb-1">Titulaire</label>
+                              <input
+                                id="cheque_titulaire"
+                                type="text"
+                                className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                value={data.cheque_titulaire || ''}
+                                onChange={e => setData('cheque_titulaire', e.target.value)}
+                              />
+                              {errors.cheque_titulaire && <div className="text-red-600 text-xs mt-1">{errors.cheque_titulaire}</div>}
+                            </div>
+                          </div>
+                          <div>
+                            <label htmlFor="file" className="block text-sm font-medium mb-1">Justificatif (PDF ou image)</label>
+                            <input
+                              id="file"
+                              type="file"
+                              accept="application/pdf,image/*"
+                              className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                              onChange={e => setData('file', e.target.files?.[0] ?? null)}
+                              // not required
+                            />
+                            {errors.file && <div className="text-red-600 text-xs mt-1">{errors.file}</div>}
+                          </div>
+                        </>
+                      )}
+                      {data.mode_paiement === 'virement' && (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div>
+                              <label htmlFor="virement_numero" className="block text-sm font-medium mb-1">Référence du virement</label>
+                              <input
+                                id="virement_numero"
+                                type="text"
+                                className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                value={data.virement_numero || ''}
+                                onChange={e => setData('virement_numero', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor="virement_date" className="block text-sm font-medium mb-1">Date du virement</label>
+                              <input
+                                id="virement_date"
+                                type="date"
+                                className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                value={data.virement_date || ''}
+                                onChange={e => setData('virement_date', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label htmlFor="file" className="block text-sm font-medium mb-1">Fichier du virement (PDF ou image)</label>
+                            <input
+                              id="file"
+                              type="file"
+                              accept="application/pdf,image/*"
+                              className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                              onChange={e => setData('file', e.target.files?.[0] ?? null)}
+                            />
+                            {errors.file && <div className="text-red-600 text-xs mt-1">{errors.file}</div>}
+                          </div>
+                          <div>
+                            <label htmlFor="virement_note" className="block text-sm font-medium mb-1">Note</label>
+                            <textarea
+                              id="virement_note"
+                              className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                              value={data.virement_note || ''}
+                              onChange={e => setData('virement_note', e.target.value)}
+                            />
+                          </div>
+                        </>
+                      )}
                       <AlertDialogFooter>
                         <AlertDialogCancel type="button">Annuler</AlertDialogCancel>
                         <AlertDialogAction asChild>
-                          <button type="submit" disabled={processing}>Valider</button>
+                          <button
+                            type="submit"
+                            disabled={
+                              processing ||
+                              !montantValid ||
+                              !data.mode_paiement ||
+                              (data.mode_paiement === 'cheque' && (
+                                !data.cheque_numero?.trim() ||
+                                !data.cheque_banque?.trim() ||
+                                !data.cheque_echeance?.trim() ||
+                                !data.cheque_titulaire?.trim()
+                              )) ||
+                              (data.mode_paiement === 'virement' && (
+                                !data.virement_numero?.trim() ||
+                                !data.virement_date?.trim()
+                              ))
+                            }
+                          >
+                            Valider
+                          </button>
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </form>
