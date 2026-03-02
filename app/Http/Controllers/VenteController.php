@@ -23,10 +23,11 @@ class VenteController extends Controller
             'client' => trim((string) $request->input('client', '')),
             'date_from' => $request->input('date_from', ''),
             'date_to' => $request->input('date_to', ''),
+            'statut' => $request->input('statut', ''),
         ];
 
         $query = Vente::query()
-            ->select(['id', 'reference', 'date', 'client_id', 'user_id', 'total_ttc'])
+            ->select(['id', 'reference', 'date', 'client_id', 'user_id', 'total_ttc', 'statut'])
             ->with(['client:id,nom', 'user:id,name'])
             ->when($filters['reference'] ?? null, function ($q, $reference) {
                 $q->where('reference', 'like', '%' . $reference . '%');
@@ -42,6 +43,9 @@ class VenteController extends Controller
             ->when($filters['date_to'] ?? null, function ($q, $to) {
                 $q->whereDate('date', '<=', $to);
             })
+            ->when($filters['statut'] ?? null, function ($q, $statut) {
+                $q->where('statut', $statut);
+            })
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -53,6 +57,8 @@ class VenteController extends Controller
             'client' => $vente->client?->nom,
             'user' => $vente->user?->name,
             'total_ttc' => (float) $vente->total_ttc,
+            'statut' => $vente->statut,
+            'statut_label' => $vente->statut_label,
         ]);
 
         $clientOptions = Client::orderBy('nom')->pluck('nom');
@@ -61,6 +67,7 @@ class VenteController extends Controller
             'ventes' => $ventes,
             'filters' => $filters,
             'clientOptions' => $clientOptions,
+            'statuts' => \App\Models\Vente::STATUTS,
         ]);
     }
 
@@ -170,6 +177,7 @@ class VenteController extends Controller
                 'user_id' => $request->user()->id,
                 'client_id' => $validated['client_id'] ?? null,
                 'date' => $validated['date'],
+                'statut' => 'brouillon',
                 'remise' => $remise,
                 'tva_rate' => $tvaRate,
                 'total_ht' => $totalHt,
@@ -293,6 +301,10 @@ class VenteController extends Controller
             'cheque_banque' => 'required_if:mode_paiement,cheque|string',
             'cheque_echeance' => 'required_if:mode_paiement,cheque|date',
             'cheque_titulaire' => 'required_if:mode_paiement,cheque|string',
+            // Virement fields only required if mode_paiement is virement
+            'virement_reference' => 'required_if:mode_paiement,virement|string|nullable',
+            'virement_transfer_date' => 'required_if:mode_paiement,virement|date|nullable',
+            'virement_note' => 'nullable|string',
         ]);
         $filePath = null;
         if ($request->hasFile('file')) {
@@ -305,6 +317,14 @@ class VenteController extends Controller
             'date_paiement' => now(),
             'file' => $filePath,
         ]);
+
+        // Recalculate total paid and reste
+        $totalPaye = $vente->suivieVentes()->sum('montant');
+        $reste = max($vente->total_ttc - $totalPaye, 0);
+        if ($reste == 0 && $vente->statut !== 'paye') {
+            $vente->statut = 'paye';
+            $vente->save();
+        }
         // Si mode_paiement = cheque, enregistrer dans cheques
         if ($validated['mode_paiement'] === 'cheque') {
             \App\Models\Cheque::create([
@@ -319,6 +339,19 @@ class VenteController extends Controller
                 'status' => 'en_attente',
                 // Optionally store titulaire if you want
                 // 'titulaire' => $validated['cheque_titulaire'] ?? '',
+            ]);
+        }
+        // Si mode_paiement = virement, enregistrer dans virements
+        if ($validated['mode_paiement'] === 'virement') {
+            \App\Models\Virement::create([
+                'direction' => 'in',
+                'source_type' => 'vente',
+                'source_id' => $vente->id,
+                'reference' => $validated['virement_reference'] ?? '',
+                'amount' => $validated['montant'],
+                'transfer_date' => $validated['virement_transfer_date'] ?? now()->toDateString(),
+                'status' => 'en_attente',
+                'note' => $validated['virement_note'] ?? '',
             ]);
         }
         return redirect()->route('ventes.show', $vente->id)->with('success', 'Paiement enregistré.');

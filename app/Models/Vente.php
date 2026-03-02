@@ -19,6 +19,7 @@ class Vente extends Model
         'user_id',
         'client_id',
         'date',
+        'statut',
         'remise',
         'tva_rate',
         'total_ht',
@@ -28,6 +29,18 @@ class Vente extends Model
         // 'montant_paye',
         // 'reste_a_payer',
     ];
+    public const STATUTS = [
+        'brouillon' => 'Brouillon',
+        'en_attente' => 'En attente',
+        'partiel' => 'Payé partiellement',
+        'paye' => 'Payé',
+        'annule' => 'Annulé',
+    ];
+
+    public function getStatutLabelAttribute(): string
+    {
+        return self::STATUTS[$this->statut] ?? $this->statut;
+    }
 
     protected $casts = [
         'date' => 'date',

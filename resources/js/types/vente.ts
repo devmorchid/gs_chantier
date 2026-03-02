@@ -1,3 +1,4 @@
+
 export interface VenteItem {
   id: number;
   produit: string | null;
@@ -19,6 +20,8 @@ export interface Vente {
   montant_paye?: number;
   reste_a_payer?: number;
   notes?: string | null;
+  statut?: string;
+  statut_label?: string;
   items?: VenteItem[];
   paiements?: Paiement[];
 }
@@ -41,3 +44,5 @@ export interface PaginatedVentes {
   from?: number | null;
   to?: number | null;
 }
+
+

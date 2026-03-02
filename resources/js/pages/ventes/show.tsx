@@ -125,47 +125,62 @@ export default function VentesShow({ vente }: Props) {
                 <div className="mt-4">
                   <h4 className="font-semibold mb-2">Historique des paiements</h4>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm border">
-                      <thead>
-                        <tr className="bg-muted">
-                          <th className="px-2 py-1 text-left">Montant</th>
-                          <th className="px-2 py-1 text-left">Mode</th>
-                          <th className="px-2 py-1 text-left">Date</th>
-                          <th className="px-2 py-1 text-left">Utilisateur</th>
-                          <th className="px-2 py-1 text-left">Fichier</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {vente.paiements.map(p => (
-                          <tr key={p.id}>
-                            <td className="px-2 py-1">{p.montant.toFixed(2)} DH</td>
-                            <td className="px-2 py-1">{p.mode_paiement}</td>
-                            <td className="px-2 py-1">{p.date_paiement}</td>
-                            <td className="px-2 py-1">{p.user ?? '-'}</td>
-                            <td className="px-2 py-1">
-                              {p.file ? (
-                                <div className="flex gap-2 items-center">
-                                  <Button size="icon" variant="ghost" type="button" onClick={() =>
-                                    p.file && setPreviewFile({
-                                      url: `/ventes/paiements/file/${encodeURIComponent(p.file.replace('paiements_ventes/', ''))}`,
-                                      type: p.file.endsWith('.pdf') ? 'application/pdf' : (p.file.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : ''),
-                                      name: p.file.split('/').pop() || 'Justificatif',
-                                    })
-                                  }>
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                  <Button asChild size="icon" variant="ghost">
-                                    <a href={`/ventes/paiements/file/${encodeURIComponent(p.file.replace('paiements_ventes/', ''))}`} target="_blank" rel="noreferrer">
-                                      <Download className="h-4 w-4" />
-                                    </a>
-                                  </Button>
-                                </div>
-                              ) : '-'}
-                            </td>
+                    <div
+                      style={{
+                        maxHeight: vente.paiements.length > 6 ? 320 : 'none',
+                        overflowY: vente.paiements.length > 6 ? 'auto' : 'visible',
+                        borderRadius: 12,
+                        border: '1px solid #e5e7eb',
+                        background: '#18181b',
+                        boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)',
+                      }}
+                      className="transition-all"
+                    >
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted sticky top-0 z-10">
+                            <th className="px-3 py-2 text-left font-semibold">Montant</th>
+                            <th className="px-3 py-2 text-left font-semibold">Mode</th>
+                            <th className="px-3 py-2 text-left font-semibold">Date</th>
+                            <th className="px-3 py-2 text-left font-semibold">Utilisateur</th>
+                            <th className="px-3 py-2 text-left font-semibold">Fichier</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {vente.paiements.map((p, i) => (
+                            <tr
+                              key={p.id}
+                              className={i % 2 === 0 ? 'bg-background' : 'bg-muted/40'}
+                            >
+                              <td className="px-3 py-2 font-medium">{p.montant.toFixed(2)} DH</td>
+                              <td className="px-3 py-2">{p.mode_paiement}</td>
+                              <td className="px-3 py-2">{p.date_paiement}</td>
+                              <td className="px-3 py-2">{p.user ?? '-'}</td>
+                              <td className="px-3 py-2">
+                                {p.file ? (
+                                  <div className="flex gap-2 items-center">
+                                    <Button size="icon" variant="ghost" type="button" onClick={() =>
+                                      p.file && setPreviewFile({
+                                        url: `/ventes/paiements/file/${encodeURIComponent(p.file.replace('paiements_ventes/', ''))}`,
+                                        type: p.file.endsWith('.pdf') ? 'application/pdf' : (p.file.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : ''),
+                                        name: p.file.split('/').pop() || 'Justificatif',
+                                      })
+                                    }>
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    <Button asChild size="icon" variant="ghost">
+                                      <a href={`/ventes/paiements/file/${encodeURIComponent(p.file.replace('paiements_ventes/', ''))}`} target="_blank" rel="noreferrer">
+                                        <Download className="h-4 w-4" />
+                                      </a>
+                                    </Button>
+                                  </div>
+                                ) : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}
@@ -192,6 +207,8 @@ export default function VentesShow({ vente }: Props) {
                             const max = vente.reste_a_payer ?? 0;
                             let val = e.target.value;
                             if (parseFloat(val) > max) val = max.toString();
+                            // Prevent montant <= 0
+                            if (parseFloat(val) <= 0) val = '';
                             setData('montant', val);
                           }}
                           className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
@@ -208,11 +225,10 @@ export default function VentesShow({ vente }: Props) {
                           className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                           required
                         >
-                          <option value="">Sélectionner</option>
+                          <option value="" disabled hidden>Sélectionner</option>
                           <option value="espece">Espèce</option>
                           <option value="cheque">Chèque</option>
                           <option value="virement">Virement</option>
-                          <option value="autre">Autre</option>
                         </select>
                         {errors.mode_paiement && <div className="text-red-600 text-xs mt-1">{errors.mode_paiement}</div>}
                       </div>
@@ -277,7 +293,6 @@ export default function VentesShow({ vente }: Props) {
                               accept="application/pdf,image/*"
                               className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                               onChange={e => setData('file', e.target.files?.[0] ?? null)}
-                              required
                             />
                             {errors.file && <div className="text-red-600 text-xs mt-1">{errors.file}</div>}
                           </div>
@@ -315,7 +330,6 @@ export default function VentesShow({ vente }: Props) {
                               accept="application/pdf,image/*"
                               className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                               onChange={e => setData('file', e.target.files?.[0] ?? null)}
-                              required
                             />
                             {errors.file && <div className="text-red-600 text-xs mt-1">{errors.file}</div>}
                           </div>
@@ -334,7 +348,27 @@ export default function VentesShow({ vente }: Props) {
                       <AlertDialogFooter>
                         <AlertDialogCancel type="button">Annuler</AlertDialogCancel>
                         <AlertDialogAction asChild>
-                          <button type="submit" disabled={processing}>Valider</button>
+                          <button
+                            type="submit"
+                            disabled={
+                              processing ||
+                              !data.montant ||
+                              parseFloat(data.montant) <= 0 ||
+                              !data.mode_paiement ||
+                              (data.mode_paiement === 'cheque' && (
+                                !data.cheque_numero ||
+                                !data.cheque_banque ||
+                                !data.cheque_echeance ||
+                                !data.cheque_titulaire
+                              )) ||
+                              (data.mode_paiement === 'virement' && (
+                                !data.virement_reference ||
+                                !data.virement_transfer_date
+                              ))
+                            }
+                          >
+                            Valider
+                          </button>
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </form>
