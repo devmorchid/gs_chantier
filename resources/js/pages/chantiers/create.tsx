@@ -53,6 +53,7 @@ export default function ChantierCreate({ responsables, clients, statuts, referen
         localisation: '',
         latitude: null as number | null,
         longitude: null as number | null,
+        radius: 100,
         adresse: '',
         date_debut: '',
         date_fin_prevue: '',
@@ -164,9 +165,31 @@ export default function ChantierCreate({ responsables, clients, statuts, referen
                                     onChange={handleLocationChange}
                                     placeholder="Rechercher une adresse au Maroc..."
                                 />
-                                <p className="text-xs text-muted-foreground">Cliquez sur 📍 pour ouvrir la carte</p>
+                                <p className="text-xs text-muted-foreground">
+                                    📍 = ouvrir la carte | ⊕ = utiliser ma position GPS actuelle
+                                </p>
                                 {errors.localisation && (
                                     <p className="text-sm text-destructive">{errors.localisation}</p>
+                                )}
+                            </div>
+
+                            {/* Rayon GPS pour Geofencing */}
+                            <div className="space-y-2">
+                                <Label htmlFor="radius">Rayon GPS autorisé (mètres)</Label>
+                                <Input
+                                    id="radius"
+                                    type="number"
+                                    min="10"
+                                    max="1000"
+                                    value={data.radius}
+                                    onChange={(e) => setData('radius', parseInt(e.target.value) || 100)}
+                                    placeholder="100"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Rayon de tolérance pour le pointage GPS (défaut: 100m). Les techniciens doivent être dans ce périmètre.
+                                </p>
+                                {errors.radius && (
+                                    <p className="text-sm text-destructive">{errors.radius}</p>
                                 )}
                             </div>
 

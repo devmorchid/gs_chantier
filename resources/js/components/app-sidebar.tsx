@@ -33,6 +33,7 @@ import {
     Boxes,
     Bell,
     ShoppingCart,
+    Wallet,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -42,6 +43,24 @@ const adminNavItems: NavItem[] = [
         title: 'Dashboard',
         href: '/dashboard',
         icon: LayoutGrid,
+    },
+    {
+        title: 'Pointage',
+        icon: ClipboardCheck,
+        children: [
+            {
+                title: 'Par Chantier',
+                href: '/pointages',
+            },
+            {
+                title: 'Dashboard Global',
+                href: '/pointages/dashboard',
+            },
+            {
+                title: 'Scanner QR',
+                href: '/pointages/scanner',
+            },
+        ],
     },
     {
         title: 'Utilisateurs',
@@ -108,19 +127,14 @@ const adminNavItems: NavItem[] = [
         icon: Warehouse,
     },
     {
-        title: 'Pointage',
-        href: '/pointage',
-        icon: ClipboardCheck,
-    },
-    {
         title: 'Charges',
         href: '/charges',
         icon: Receipt,
     },
     {
-        title: 'Paiements & Chèques',
+        title: 'Paie Techniciens',
         href: '/paiements',
-        icon: CreditCard,
+        icon: Wallet,
     },
     {
         title: 'Devis',
@@ -193,8 +207,30 @@ const chefChantierNavItems: NavItem[] = [
     },
     {
         title: 'Pointage',
-        href: '/pointage',
         icon: ClipboardCheck,
+        children: [
+            {
+                title: 'Mes Chantiers',
+                href: '/pointages',
+            },
+            {
+                title: 'Dashboard Global',
+                href: '/pointages/dashboard',
+            },
+            {
+                title: 'Statistiques',
+                href: '/pointages/statistiques',
+            },
+            {
+                title: 'Scanner QR',
+                href: '/pointages/scanner',
+            },
+        ],
+    },
+    {
+        title: 'Paie Techniciens',
+        href: '/paiements',
+        icon: Wallet,
     },
     {
         title: 'Devis',
@@ -230,6 +266,11 @@ const technicienNavItems: NavItem[] = [
         href: '/mon-pointage',
         icon: ClipboardCheck,
     },
+    {
+        title: 'Scanner QR',
+        href: '/pointages/scanner',
+        icon: Camera,
+    },
 ];
 
 const footerNavItems: NavItem[] = [];
@@ -250,9 +291,235 @@ function getNavItemsByRole(roles: string[] = []): NavItem[] {
 }
 
 export function AppSidebar() {
-    const { auth, notificationCount } = usePage<SharedData>().props;
+    const { auth, notificationCount, chantiers = [], techniciens = [] } = usePage<SharedData>().props;
     const userRoles = auth.user?.roles || [];
-    const mainNavItems = getNavItemsByRole(userRoles).map((item) => {
+
+    // Construire le menu Pointage dynamiquement
+    const buildPointageMenu = (): NavItem => {
+        const pointageMenuChildren: NavItem[] = [
+            {
+                title: 'Par Chantier',
+                href: '/pointages',
+            },
+            {
+                title: 'Par Technicien',
+                href: '/pointages/techniciens',
+            },
+            {
+                title: 'Dashboard Global',
+                href: '/pointages/dashboard',
+            },
+            {
+                title: 'Statistiques',
+                href: '/pointages/statistiques',
+            },
+            {
+                title: 'Scanner QR',
+                href: '/pointages/scanner',
+            },
+        ];
+
+        return {
+            title: 'Pointage',
+            icon: ClipboardCheck,
+            children: pointageMenuChildren,
+        };
+    };
+
+    // Mettre à jour adminNavItems avec le menu Pointage dynamique
+    const adminNavItemsUpdated: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: '/dashboard',
+            icon: LayoutGrid,
+        },
+        buildPointageMenu(),
+        {
+            title: 'Utilisateurs',
+            href: '/utilisateurs',
+            icon: Users,
+        },
+        {
+            title: 'Clients',
+            href: '/clients',
+            icon: Building2,
+        },
+        {
+            title: 'Chantiers',
+            href: '/chantiers',
+            icon: HardHat,
+        },
+        {
+            title: 'Services',
+            href: '/services',
+            icon: Wrench,
+        },
+        {
+            title: 'Catalogue des services',
+            href: '/catalog-services',
+            icon: ClipboardCheck,
+        },
+        {
+            title: 'Équipes',
+            href: '/equipes',
+            icon: Boxes,
+        },
+        {
+            title: 'Techniciens',
+            href: '/techniciens',
+            icon: UserCog,
+        },
+        {
+            title: 'Produits',
+            href: '/produits',
+            icon: Package,
+            children: [
+                {
+                    title: 'Produits',
+                    href: '/produits',
+                },
+                {
+                    title: 'Catégories',
+                    href: '/product-categories',
+                },
+                {
+                    title: 'Fournisseurs',
+                    href: '/fournisseurs',
+                },
+            ],
+        },
+        {
+            title: 'Achats',
+            href: '/achats',
+            icon: ShoppingCart,
+        },
+        {
+            title: 'Mouvements de stock',
+            href: '/stock-mouvements',
+            icon: Warehouse,
+        },
+        {
+            title: 'Charges',
+            href: '/charges',
+            icon: Receipt,
+        },
+        {
+            title: 'Paie Techniciens',
+            href: '/paiements',
+            icon: Wallet,
+        },
+        {
+            title: 'Devis',
+            href: '/devis',
+            icon: FileText,
+        },
+        {
+            title: 'Factures',
+            href: '/factures',
+            icon: FileCheck,
+        },
+        {
+            title: 'Statistiques',
+            href: '/statistiques',
+            icon: BarChart3,
+        },
+        {
+            title: 'Notifications',
+            href: '/notifications',
+            icon: Bell,
+        },
+        {
+            title: 'Paramètres',
+            href: '/parametres',
+            icon: Settings,
+        },
+        {
+            title: 'Chèques',
+            href: '/cheques/dashboard',
+            icon: CreditCard,
+        },
+    ];
+
+    // Même chose pour chefChantierNavItems
+    const chefChantierNavItemsUpdated: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: '/dashboard',
+            icon: LayoutGrid,
+        },
+        buildPointageMenu(),
+        {
+            title: 'Clients',
+            href: '/clients',
+            icon: Building2,
+        },
+        {
+            title: 'Mes Chantiers',
+            href: '/mes-chantiers',
+            icon: HardHat,
+        },
+        {
+            title: 'Services',
+            href: '/services',
+            icon: Wrench,
+        },
+        {
+            title: 'Équipes',
+            href: '/equipes',
+            icon: Boxes,
+        },
+        {
+            title: 'Techniciens',
+            href: '/techniciens',
+            icon: UserCog,
+        },
+        {
+            title: 'Mouvements de stock',
+            href: '/stock-mouvements',
+            icon: Warehouse,
+        },
+        {
+            title: 'Devis',
+            href: '/devis',
+            icon: FileText,
+        },
+        {
+            title: 'Factures',
+            href: '/factures',
+            icon: FileCheck,
+        },
+        {
+            title: 'Photos & Notes',
+            href: '/photos-notes',
+            icon: Camera,
+        },
+        {
+            title: 'Rapports',
+            href: '/rapports',
+            icon: FileBarChart,
+        },
+        {
+            title: 'Notifications',
+            href: '/notifications',
+            icon: Bell,
+        },
+    ];
+
+    // Fonction pour obtenir les items selon le rôle
+    const getNavItemsByRole = (): NavItem[] => {
+        if (userRoles.includes('admin')) {
+            return adminNavItemsUpdated;
+        }
+        if (userRoles.includes('chef_chantier')) {
+            return chefChantierNavItemsUpdated;
+        }
+        if (userRoles.includes('technicien')) {
+            return technicienNavItems;
+        }
+        return chefChantierNavItemsUpdated;
+    };
+
+    const mainNavItems = getNavItemsByRole().map((item) => {
         if (item.title !== 'Notifications') {
             return item;
         }

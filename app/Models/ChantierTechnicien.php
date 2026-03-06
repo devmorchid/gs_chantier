@@ -12,6 +12,7 @@ class ChantierTechnicien extends Model
         'date_affectation',
         'date_fin',
         'actif',
+        'salaire_journalier',
     ];
 
     public function chantier()

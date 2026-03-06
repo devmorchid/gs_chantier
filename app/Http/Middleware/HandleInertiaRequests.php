@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Chantier;
+use App\Models\Technicien;
 use App\Models\StockTransferRequest;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -66,6 +67,8 @@ class HandleInertiaRequests extends Middleware
             ],
             'notificationCount' => $notificationCount,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'chantiers' => Chantier::select('id', 'nom')->get(),
+            'techniciens' => Technicien::select('id', 'nom', 'prenom')->get(),
         ];
     }
 }

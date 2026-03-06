@@ -1,17 +1,51 @@
+
 <?php
+use App\Http\Controllers\PointageDashboardController;
+// Dashboard & Stats Pointage
+Route::middleware(['auth', 'verified', 'role:admin|chef_chantier'])->group(function () {
+    Route::get('/pointages', [PointageDashboardController::class, 'index'])->name('pointages.index');
+    Route::get('/pointages/dashboard', [PointageDashboardController::class, 'today'])->name('pointages.dashboard');
+    Route::get('/pointages/techniciens', [PointageDashboardController::class, 'techniciens'])->name('pointages.techniciens');
+    Route::get('/pointages/statistiques', [PointageDashboardController::class, 'statistiques'])->name('pointages.statistiques');
+    Route::get('/chantier/{chantier}/pointages', [PointageDashboardController::class, 'byChantier'])->name('chantier.pointages');
+    Route::get('/technicien/{technicien}/pointages', [PointageDashboardController::class, 'byTechnicien'])->name('technicien.pointages');
+    Route::get('/technicien/{technicien}/pointages/export', [PointageDashboardController::class, 'exportTechnicien'])->name('technicien.pointages.export');
+    Route::get('/technicien/{technicien}/pointages/pdf', [PointageDashboardController::class, 'pdfTechnicien'])->name('technicien.pointages.pdf');
+});
+
+// Modification pointage (admin uniquement)
+Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
+    Route::put('/pointages/{pointage}/update', [PointageDashboardController::class, 'updatePointage'])->name('pointages.update');
+});
+
+use App\Http\Controllers\PointageController;
+// Scanner QR page
+Route::middleware(['auth'])->get('/pointages/scanner', [PointageController::class, 'scanner'])->name('pointages.scanner');
+// Scanner QR POST (CSRF excluded in bootstrap/app.php)
+Route::middleware(['auth'])->post('/pointages/scan', [PointageController::class, 'scan'])->name('pointages.scan');
+
+use App\Http\Controllers\PointageApiController;
+// API pour pointage selfie
+Route::post('/api/pointage', [PointageApiController::class, 'store']);
+use App\Http\Controllers\PointageSimpleController;
+// Pointage simple: galerie techniciens (entrée)
+Route::get('/pointage', [PointageSimpleController::class, 'index'])->name('pointage.index');
+use Inertia\Inertia;
+// Route pour interface technicien (main)
 
 use App\Http\Controllers\ChantierController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DevisController;
 use App\Http\Controllers\EquipeController;
 use App\Http\Controllers\FactureController;
+use App\Http\Controllers\PaiementTechnicienController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\ServiceDetailController;
 use App\Http\Controllers\TechnicienController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\CatalogServiceController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
+
 use Laravel\Fortify\Features;
 
 use BaconQrCode\Renderer\Image\PngRenderer;
@@ -21,16 +55,32 @@ use BaconQrCode\Writer;
 
 use App\Models\Cheque;
 
-Route::get('/test-qr', function() {
-    $renderer = new PngRenderer(
-        new RendererStyle(200),
-        new GdImageBackEnd()
-    );
-    $writer = new Writer($renderer);
-    $qrPng = $writer->writeString('test qr');
-    file_put_contents(storage_path('app/public/test-qr.png'), $qrPng);
-    return 'done';
+use App\Http\Controllers\PointageMoisController;
+// Pointage mensuel (présence techniciens)
+Route::middleware(['auth', 'verified', 'role:admin|chef_chantier'])->get('/pointages/mois', [PointageMoisController::class, 'index'])->name('pointages.mois');
+
+use App\Http\Controllers\ChantierListController;
+// API pour récupérer tous les chantiers (en cours + terminés)
+Route::get('/api/chantiers', [ChantierListController::class, 'index']);
+use App\Http\Controllers\PointageTodayController;
+// Page de présence quotidienne (today)
+Route::middleware(['auth', 'verified', 'role:admin|chef_chantier'])->get('/pointages/today', [PointageTodayController::class, 'index'])->name('pointages.today');
+
+
+// Pointage Chantiers (admin)
+Route::middleware(['auth', 'role:admin'])->get('/attendances', function () {
+    return Inertia::render('attendances/index');
 });
+
+
+
+
+Route::get('/technicien/main', function () {
+    return Inertia::render('technicien/main');
+})->middleware(['role:technicien'])->name('technicien.main');
+
+
+
 
 
 // Rapports PDF & Excel (hors Inertia)
@@ -123,6 +173,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('techniciens', TechnicienController::class);
         Route::patch('techniciens/{technicien}/toggle-disponible', [TechnicienController::class, 'toggleDisponible'])
             ->name('techniciens.toggle-disponible');
+        // Badge QR routes
+        Route::get('techniciens/{technicien}/badge', [TechnicienController::class, 'badge'])->name('techniciens.badge');
+        Route::get('techniciens/badges/all', [TechnicienController::class, 'badgesAll'])->name('techniciens.badges.all');
     });
 
     // Équipes (IKIB) - Admin et Chef de chantier
@@ -192,6 +245,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('factures.pdf-stream');
     });
 
+    // Paiements Techniciens (Admin et Chef de chantier)
+    Route::middleware(['role:admin|chef_chantier'])->prefix('paiements')->group(function () {
+        Route::get('/', [PaiementTechnicienController::class, 'index'])->name('paiements.index');
+        Route::get('/technicien/{technicien}', [PaiementTechnicienController::class, 'show'])->name('paiements.show');
+        Route::post('/technicien/{technicien}/payer', [PaiementTechnicienController::class, 'payer'])->name('paiements.payer');
+        Route::post('/technicien/{technicien}/avance', [PaiementTechnicienController::class, 'storeAvance'])->name('paiements.avance');
+        Route::post('/technicien/{technicien}/deduction', [PaiementTechnicienController::class, 'storeDeduction'])->name('paiements.deduction');
+        Route::post('/technicien/{technicien}/prime', [PaiementTechnicienController::class, 'storePrime'])->name('paiements.prime');
+        Route::get('/technicien/{technicien}/pdf', [PaiementTechnicienController::class, 'pdf'])->name('paiements.pdf');
+    });
+
     // Mes Chantiers (pour Chef de chantier - même controller mais route différente)
     Route::middleware(['role:chef_chantier'])->group(function () {
         Route::get('mes-chantiers', [ChantierController::class, 'index'])->name('mes-chantiers.index');
@@ -239,3 +303,15 @@ Route::middleware(['auth', 'verified', 'role:technicien'])->group(function () {
     Route::get('mon-pointage', [TechnicienPointageController::class, 'index'])->name('technicien.pointage');
     Route::post('mon-pointage', [TechnicienPointageController::class, 'store']);
 });
+// Pour accéder au projet depuis le téléphone sur le même réseau local :
+// 1. Remplace la commande de lancement par :
+//    php artisan serve --host=0.0.0.0
+// 2. Note l'adresse IP de ton PC (ex: 192.168.1.10)
+// 3. Depuis ton téléphone, ouvre : http://192.168.1.10:8000
+//
+// Astuce :
+// - Assure-toi que le firewall Windows autorise le port 8000
+// - Les deux appareils doivent être sur le même WiFi
+//
+// Tu peux aussi lancer vite avec :
+//    npm run dev -- --host

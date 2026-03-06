@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { MapPin, Search, X, Navigation, Loader2 } from 'lucide-react';
+import { MapPin, Search, X, Navigation, Loader2, LocateFixed } from 'lucide-react';
 
 interface LeafletMapPickerProps {
     value: string;
@@ -33,6 +33,7 @@ export function LeafletMapPicker({
     const [searchValue, setSearchValue] = useState(value);
     const [showMap, setShowMap] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+    const [isGettingLocation, setIsGettingLocation] = useState(false);
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -204,6 +205,7 @@ export function LeafletMapPicker({
     // Obtenir la position actuelle
     const getCurrentLocation = () => {
         if (navigator.geolocation) {
+            setIsGettingLocation(true);
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
                     const lat = position.coords.latitude;
@@ -222,10 +224,17 @@ export function LeafletMapPicker({
                     const address = await reverseGeocode(lat, lng);
                     setSearchValue(address);
                     onChange({ address, latitude: lat, longitude: lng });
+                    setIsGettingLocation(false);
                 },
                 (error) => {
                     console.error('Erreur de géolocalisation:', error);
-                    alert('Impossible d\'obtenir votre position. Vérifiez les permissions de géolocalisation.');
+                    setIsGettingLocation(false);
+                    alert('Impossible d\'obtenir votre position. Vérifiez les permissions GPS.');
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
                 }
             );
         } else {
@@ -262,10 +271,10 @@ export function LeafletMapPicker({
                     onChange={handleSearchChange}
                     onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
                     placeholder={placeholder}
-                    className="pl-9 pr-20"
+                    className="pl-9 pr-28"
                 />
                 <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
-                    {isSearching && (
+                    {(isSearching || isGettingLocation) && (
                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mr-1" />
                     )}
                     {searchValue && (
@@ -275,10 +284,22 @@ export function LeafletMapPicker({
                             size="icon"
                             className="h-7 w-7"
                             onClick={clearLocation}
+                            title="Effacer"
                         >
                             <X className="h-4 w-4" />
                         </Button>
                     )}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={getCurrentLocation}
+                        disabled={isGettingLocation}
+                        title="Utiliser ma position actuelle"
+                    >
+                        <LocateFixed className={`h-4 w-4 ${isGettingLocation ? 'animate-pulse text-primary' : ''}`} />
+                    </Button>
                     <Button
                         type="button"
                         variant="ghost"
