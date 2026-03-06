@@ -397,7 +397,10 @@ class AchatController extends Controller
 		$pdf = Pdf::loadView('pdf.achat', [
 			'achat' => $achat,
 			'company' => $company,
+			'items' => $achat->items,
 		]);
+
+		$pdf->getDomPDF()->set_option('isPhpEnabled', true);
 
 		$fileName = 'achat-' . $achat->reference . '.pdf';
 

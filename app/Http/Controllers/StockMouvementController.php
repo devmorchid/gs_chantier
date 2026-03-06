@@ -128,6 +128,8 @@ class StockMouvementController extends Controller
             'company' => $company,
         ]);
 
+        $pdf->getDomPDF()->set_option('isPhpEnabled', true);
+
         $fileName = 'mouvement-stock-' . $stockMouvement->id . '.pdf';
 
         return response($pdf->output(), 200)

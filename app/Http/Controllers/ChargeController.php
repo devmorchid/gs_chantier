@@ -425,8 +425,13 @@ class ChargeController extends Controller
             'company' => $company,
         ]);
 
-        $fileRef = $charge->reference ?: (string) $charge->id;
+        $pdf->getDomPDF()->set_option('isPhpEnabled', true);
 
-        return $pdf->download('Charge_' . $fileRef . '.pdf');
+        $fileRef = $charge->reference ?: (string) $charge->id;
+        $fileName = 'Charge_' . $fileRef . '.pdf';
+
+        return response($pdf->output(), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
     }
 }

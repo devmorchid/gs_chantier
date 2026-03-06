@@ -365,7 +365,10 @@ class VenteController extends Controller
         $pdf = Pdf::loadView('pdf.vente', [
             'vente' => $vente,
             'company' => $company,
+            'items' => $vente->items,
         ]);
+
+        $pdf->getDomPDF()->set_option('isPhpEnabled', true);
 
         $fileName = 'vente-' . $vente->reference . '.pdf';
 

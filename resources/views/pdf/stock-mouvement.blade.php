@@ -48,8 +48,8 @@
                 </td>
                 <td width="30%" class="text-center">
                     <div style="font-weight: bold; font-size: 12px; line-height: 1.4;">
-                        Gestion Chantier<br>
-                        Mouvement de stock
+                        Electricité de bâtiment<br>
+                        & industrielle - travaux divers
                     </div>
                     <div style="font-size: 20px; margin-top: 15px; font-weight: bold; text-decoration: underline;">MOUVEMENT DE STOCK</div>
                 </td>
@@ -89,36 +89,42 @@
                 </td>
             </tr>
         </table>
+        @php $chunks = $items->chunk(12); @endphp
+        @foreach($chunks as $chunkIndex => $chunk)
         <table class="items-table">
             <thead>
                 <tr>
-                    <th width="60%">Produit</th>
-                    <th width="40%">Quantité</th>
+                    <th width="10%">Réf</th>
+                    <th width="60%">PRODUIT</th>
+                    <th width="30%">QUANTITÉ</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach ($items as $i => $item)
+                @foreach($chunk as $i => $item)
+                @php $globalIndex = $chunkIndex * 12 + $loop->index; @endphp
                 <tr>
+                    <td class="text-center">{{ chr(65 + ($globalIndex % 26)) . ($globalIndex >= 26 ? (intdiv($globalIndex, 26)) : '') }}</td>
                     <td class="text-left" style="padding-left: 10px;">{{ $item->produit?->name ?? '-' }}</td>
                     <td class="text-center">{{ $item->quantite }}</td>
                 </tr>
                 @endforeach
-                @for ($i = count($items); $i < 12; $i++)
-                <tr>
-                    <td class="text-left">-</td>
-                    <td class="text-center">0</td>
-                </tr>
-                @endfor
             </tbody>
         </table>
+        @if(!$loop->last)
+            <div style="page-break-after: always;"></div>
+        @endif
+        @endforeach
     </div>
     <script type="text/php">
         if (isset($pdf)) {
-            $text = "Page {PAGE_NUM} / {PAGE_COUNT}";
-            $font = $fontMetrics->get_font("helvetica", "bold");
-            $size = 9;
-            $color = array(0.2, 0.2, 0.2);
-            $pdf->page_text(480, 815, $text, $font, $size, $color);
+            $PAGE_COUNT = $pdf->get_page_count();
+            if ($PAGE_COUNT > 1) {
+                $text = "Page {PAGE_NUM} / {PAGE_COUNT}";
+                $font = $fontMetrics->get_font("helvetica", "bold");
+                $size = 9;
+                $color = array(0.2, 0.2, 0.2);
+                $pdf->page_text(480, 815, $text, $font, $size, $color);
+            }
         }
     </script>
 </body>
