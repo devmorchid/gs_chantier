@@ -10,14 +10,21 @@ class ProductCategoryController extends Controller
 {
     public function index(Request $request)
     {
-        $filters = $request->only(['search']);
+        $filters = [
+            'search' => trim((string) $request->input('search', '')),
+        ];
 
-        $categories = ProductCategory::withCount('produits')
+        $categories = ProductCategory::query()
+            ->select(['id', 'name', 'description', 'created_at'])
+            ->withCount('produits')
             ->when($filters['search'] ?? null, function ($query, $search) {
-                $query->where('name', 'like', '%' . $search . '%')
-                    ->orWhere('description', 'like', '%' . $search . '%');
+                $query->where(function ($sub) use ($search) {
+                    $sub->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('description', 'like', '%' . $search . '%');
+                });
             })
             ->orderBy('name')
+            ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
 

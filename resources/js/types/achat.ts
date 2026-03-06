@@ -5,6 +5,16 @@ export interface AchatItem {
   prix_achat: number;
 }
 
+
+export interface Paiement {
+  id: number;
+  montant: number;
+  mode_paiement: string;
+  date_paiement: string;
+  file?: string | null;
+  user?: string | null;
+}
+
 export interface Achat {
   id: number;
   reference: string;
@@ -16,8 +26,12 @@ export interface Achat {
   total_ht?: number;
   total_tva?: number;
   total_ttc?: number;
+  montant_paye?: number;
+  reste_a_payer?: number;
   notes?: string | null;
   items?: AchatItem[];
+  paiements?: Paiement[];
+  statut?: string; // Added for status badge and filtering
 }
 
 export interface PaginatedAchats {

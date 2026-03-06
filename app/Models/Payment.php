@@ -11,6 +11,7 @@ class Payment extends Model
 
     protected $fillable = [
         'facture_id',
+        'user_id',
         'amount',
         'payment_method',
         'reference',
@@ -18,10 +19,16 @@ class Payment extends Model
         'cheque_number',
         'payment_date',
         'notes',
+        'file',
     ];
 
     public function facture()
     {
         return $this->belongsTo(Facture::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

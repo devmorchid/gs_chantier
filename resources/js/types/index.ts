@@ -5,6 +5,8 @@ export type * from './ui';
 export type * from './stock_mouvement';
 export type * from './produit';
 export type * from './achat';
+export type * from './charge';
+export type * from './vente';
 
 import type { Auth } from './auth';
 

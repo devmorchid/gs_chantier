@@ -13,6 +13,9 @@ import { Plus, Eye, FileText } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Achat, PaginatedAchats } from '@/types/achat';
 
+import { Badge } from '@/components/ui/badge';
+import { Achat as AchatType } from '@/types/achat';
+
 interface Props {
   achats: PaginatedAchats;
   filters: {
@@ -20,16 +23,19 @@ interface Props {
     fournisseur?: string;
     date_from?: string;
     date_to?: string;
+    statut?: string;
   };
   fournisseurOptions: string[];
+  statuts?: Record<string, string>;
 }
 
-export default function AchatsIndex({ achats, filters, fournisseurOptions }: Props) {
+export default function AchatsIndex({ achats, filters, fournisseurOptions, statuts }: Props) {
   const [filterState, setFilterState] = useState({
     reference: filters.reference ?? '',
     fournisseur: filters.fournisseur ?? '',
     date_from: filters.date_from ?? '',
     date_to: filters.date_to ?? '',
+    statut: filters.statut ?? '',
   });
   const [dateError, setDateError] = useState('');
   const didMount = useRef(false);
@@ -38,7 +44,8 @@ export default function AchatsIndex({ achats, filters, fournisseurOptions }: Pro
     left.reference === right.reference &&
     left.fournisseur === right.fournisseur &&
     left.date_from === right.date_from &&
-    left.date_to === right.date_to;
+    left.date_to === right.date_to &&
+    left.statut === right.statut;
 
   const applyFilters = (nextFilters: typeof filterState) => {
     if (nextFilters.date_from && nextFilters.date_to && nextFilters.date_from > nextFilters.date_to) {
@@ -50,7 +57,7 @@ export default function AchatsIndex({ achats, filters, fournisseurOptions }: Pro
   };
 
   const resetFilters = () => {
-    const cleared = { reference: '', fournisseur: '', date_from: '', date_to: '' };
+    const cleared = { reference: '', fournisseur: '', date_from: '', date_to: '', statut: '' };
     setFilterState(cleared);
     router.get('/achats', {}, { preserveState: true, replace: true, preserveScroll: true });
   };
@@ -61,8 +68,8 @@ export default function AchatsIndex({ achats, filters, fournisseurOptions }: Pro
       fournisseur: filters.fournisseur ?? '',
       date_from: filters.date_from ?? '',
       date_to: filters.date_to ?? '',
+      statut: filters.statut ?? '',
     };
-
     if (!isSameFilters(filterState, nextState)) {
       setFilterState(nextState);
     }
@@ -85,6 +92,7 @@ export default function AchatsIndex({ achats, filters, fournisseurOptions }: Pro
       fournisseur: filters.fournisseur ?? '',
       date_from: filters.date_from ?? '',
       date_to: filters.date_to ?? '',
+      statut: filters.statut ?? '',
     })) {
       return;
     }
@@ -127,7 +135,20 @@ export default function AchatsIndex({ achats, filters, fournisseurOptions }: Pro
                 </div>
                 <Button variant="outline" onClick={resetFilters}>Réinitialiser</Button>
               </div>
-              <div className="grid gap-4 md:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-5">
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Statut</label>
+                                  <select
+                                    className="border rounded-md w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                    value={filterState.statut}
+                                    onChange={e => applyFilters({ ...filterState, statut: e.target.value })}
+                                  >
+                                    <option value="">Tous</option>
+                                    {statuts && Object.entries(statuts).map(([key, label]) => (
+                                      <option key={key} value={key}>{label}</option>
+                                    ))}
+                                  </select>
+                                </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Référence</label>
                   <Input
@@ -180,17 +201,38 @@ export default function AchatsIndex({ achats, filters, fournisseurOptions }: Pro
                   <TableHead>Responsable</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Total TTC</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {achats.data.map((achat: Achat) => (
+                {achats.data.map((achat: AchatType) => (
                   <TableRow key={achat.id}>
                     <TableCell>{achat.reference}</TableCell>
                     <TableCell>{achat.fournisseur ?? '-'}</TableCell>
                     <TableCell>{achat.user ?? '-'}</TableCell>
                     <TableCell>{achat.date}</TableCell>
                     <TableCell>{achat.total_ttc?.toFixed(2)} DH</TableCell>
+                    <TableCell>
+                      {statuts && achat.statut && (
+                        <Badge
+                          className={
+                            achat.statut === 'paye'
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : achat.statut === 'partiel'
+                              ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                              : achat.statut === 'en_attente'
+                              ? 'bg-gray-100 text-gray-800 border-gray-200'
+                              : achat.statut === 'annule'
+                              ? 'bg-red-100 text-red-800 border-red-200'
+                              : ''
+                          }
+                          variant="outline"
+                        >
+                          {statuts[achat.statut] ?? achat.statut}
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button asChild size="icon" variant="ghost">
                         <Link href={`/achats/${achat.id}`}><Eye className="h-4 w-4" /></Link>

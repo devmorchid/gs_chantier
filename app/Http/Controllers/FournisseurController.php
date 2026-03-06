@@ -8,12 +8,53 @@ use Inertia\Inertia;
 
 class FournisseurController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $fournisseurs = Fournisseur::orderBy('name')->paginate(20);
+        $filters = $request->only(['search', 'type', 'status', 'ville']);
+
+        $fournisseurs = Fournisseur::query()
+            ->select([
+                'id',
+                'type',
+                'name',
+                'telephone',
+                'email',
+                'status',
+                'ville',
+                'pays',
+                'created_at',
+            ])
+            ->when($filters['search'] ?? null, function ($query, $search) {
+                $query->where(function ($sub) use ($search) {
+                    $sub->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('telephone', 'like', '%' . $search . '%')
+                        ->orWhere('email', 'like', '%' . $search . '%');
+                });
+            })
+            ->when($filters['type'] ?? null, function ($query, $type) {
+                $query->where('type', $type);
+            })
+            ->when($filters['status'] ?? null, function ($query, $status) {
+                $query->where('status', $status);
+            })
+            ->when($filters['ville'] ?? null, function ($query, $ville) {
+                $query->where('ville', 'like', '%' . $ville . '%');
+            })
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $villeOptions = Fournisseur::query()
+            ->whereNotNull('ville')
+            ->where('ville', '!=', '')
+            ->distinct()
+            ->orderBy('ville')
+            ->pluck('ville');
 
         return Inertia::render('fournisseurs/index', [
             'fournisseurs' => $fournisseurs,
+            'filters' => $filters,
+            'villeOptions' => $villeOptions,
         ]);
     }
 

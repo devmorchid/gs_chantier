@@ -291,21 +291,18 @@ class ChantierController extends Controller
             ];
         });
 
-        $stockProduits = DB::table('stock_mouvements')
-            ->join('produits', 'produits.id', '=', 'stock_mouvements.produit_id')
-            ->where(function ($query) use ($chantier) {
-                $query->where('stock_mouvements.destination', $chantier->nom)
-                    ->orWhere('stock_mouvements.origine', $chantier->nom);
-            })
-            ->groupBy('produits.id', 'produits.name', 'produits.code_barre')
+        $stockProduits = DB::table('stocks')
+            ->join('produits', 'produits.id', '=', 'stocks.produit_id')
+            ->where('stocks.chantier_id', $chantier->id)
+            ->groupBy('produits.id', 'produits.name', 'produits.code_barre', 'stocks.quantite')
             ->orderBy('produits.name')
             ->select([
                 'produits.id as produit_id',
                 'produits.name',
                 'produits.code_barre',
-                DB::raw("SUM(CASE WHEN stock_mouvements.destination = '{$chantier->nom}' THEN stock_mouvements.quantite ELSE 0 END) - SUM(CASE WHEN stock_mouvements.origine = '{$chantier->nom}' THEN stock_mouvements.quantite ELSE 0 END) as quantite"),
+                'stocks.quantite',
             ])
-            ->having('quantite', '!=', 0)
+            ->having('stocks.quantite', '!=', 0)
             ->get();
 
         return Inertia::render('chantiers/show', [

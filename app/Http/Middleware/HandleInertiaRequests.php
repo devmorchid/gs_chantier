@@ -5,6 +5,8 @@ namespace App\Http\Middleware;
 use App\Models\Chantier;
 use App\Models\Technicien;
 use App\Models\StockTransferRequest;
+use App\Notifications\ChargeDecisionNotification;
+use App\Notifications\ChargeSubmittedNotification;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -53,6 +55,13 @@ class HandleInertiaRequests extends Middleware
                 ->where('requester_id', $user->id)
                 ->whereIn('status', ['approved', 'rejected'])
                 ->whereNull('requester_read_at')
+                ->count();
+
+            $notificationCount += $user->unreadNotifications()
+                ->whereIn('type', [
+                    ChargeSubmittedNotification::class,
+                    ChargeDecisionNotification::class,
+                ])
                 ->count();
         }
 

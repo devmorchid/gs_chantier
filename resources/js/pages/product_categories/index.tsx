@@ -73,7 +73,12 @@ export default function ProductCategoriesIndex({ categories, filters }: Props) {
 
   const resetSearch = () => {
     setSearch('');
-    router.get('/product-categories', {}, { preserveState: true, replace: true, preserveScroll: true });
+    router.get('/product-categories', {}, {
+      only: ['categories', 'filters'],
+      preserveState: true,
+      replace: true,
+      preserveScroll: true,
+    });
   };
 
   useEffect(() => {
@@ -86,7 +91,12 @@ export default function ProductCategoriesIndex({ categories, filters }: Props) {
       return;
     }
     const timer = setTimeout(() => {
-      router.get('/product-categories', { search }, { preserveState: true, replace: true, preserveScroll: true });
+      router.get('/product-categories', { search }, {
+        only: ['categories', 'filters'],
+        preserveState: true,
+        replace: true,
+        preserveScroll: true,
+      });
     }, 300);
 
     return () => clearTimeout(timer);
@@ -198,7 +208,12 @@ export default function ProductCategoriesIndex({ categories, filters }: Props) {
                       variant={link.active ? 'default' : 'outline'}
                       size="sm"
                       disabled={!link.url}
-                      onClick={() => link.url && router.get(link.url, {}, { preserveState: true, replace: true, preserveScroll: true })}
+                      onClick={() => link.url && router.get(link.url, {}, {
+                        only: ['categories', 'filters'],
+                        preserveState: true,
+                        replace: true,
+                        preserveScroll: true,
+                      })}
                       dangerouslySetInnerHTML={{ __html: link.label }}
                     />
                   ))}

@@ -1,6 +1,8 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import {
   Card,
   CardContent,
@@ -19,7 +21,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Plus, Pencil, Trash2, Eye, Users, Building2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Fournisseur {
   id: number;
@@ -47,12 +49,60 @@ interface Props {
       active: boolean;
     }>;
   };
+  filters: {
+    search?: string;
+    type?: string;
+    status?: string;
+    ville?: string;
+  };
+  villeOptions: string[];
 }
 
-export default function FournisseursIndex({ fournisseurs }: Props) {
+export default function FournisseursIndex({ fournisseurs, filters, villeOptions }: Props) {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleteLabel, setDeleteLabel] = useState('');
   const [open, setOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState(filters.search ?? '');
+
+  useEffect(() => {
+    setSearchValue(filters.search ?? '');
+  }, [filters.search]);
+
+  const applyFilters = (patch: Partial<Props['filters']>) => {
+    const nextFilters = {
+      search: filters.search ?? '',
+      type: filters.type ?? '',
+      status: filters.status ?? '',
+      ville: filters.ville ?? '',
+      ...patch,
+    };
+
+    router.get('/fournisseurs', {
+      search: nextFilters.search || undefined,
+      type: nextFilters.type || undefined,
+      status: nextFilters.status || undefined,
+      ville: nextFilters.ville || undefined,
+    }, {
+      only: ['fournisseurs', 'filters', 'villeOptions'],
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+    });
+  };
+
+  useEffect(() => {
+    const delay = setTimeout(() => {
+      if ((filters.search ?? '') !== searchValue) {
+        applyFilters({ search: searchValue });
+      }
+    }, 300);
+
+    return () => clearTimeout(delay);
+  }, [searchValue]);
+
+  const resetFilters = () => {
+    router.get('/fournisseurs');
+  };
 
   const handleDelete = (id: number, label: string) => {
     setDeleteId(id);
@@ -125,6 +175,66 @@ export default function FournisseursIndex({ fournisseurs }: Props) {
             <p className="text-sm text-muted-foreground">Consultez et gérez vos fournisseurs.</p>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3 lg:flex-nowrap">
+              <Input
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                placeholder="Rechercher (nom, téléphone, email)"
+                className="min-w-[260px] flex-1"
+              />
+              <div className="w-full sm:w-[180px] lg:w-[200px]">
+                <Select
+                  value={filters.ville && filters.ville !== '' ? filters.ville : 'all'}
+                  onValueChange={(value) => applyFilters({ ville: value === 'all' ? '' : value })}
+                >
+                  <SelectTrigger className="w-full">
+                    {filters.ville || 'Ville'}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les villes</SelectItem>
+                    {villeOptions.map((ville) => (
+                      <SelectItem key={ville} value={ville}>{ville}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full sm:w-[160px] lg:w-[180px]">
+                <Select
+                  value={filters.type && filters.type !== '' ? filters.type : 'all'}
+                  onValueChange={(value) => applyFilters({ type: value === 'all' ? '' : value })}
+                >
+                  <SelectTrigger className="w-full">
+                    {filters.type === 'societe' ? 'Société' : filters.type === 'personne' ? 'Personne' : 'Type'}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les types</SelectItem>
+                    <SelectItem value="societe">Société</SelectItem>
+                    <SelectItem value="personne">Personne</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full sm:w-[130px] lg:w-[140px]">
+                <Select
+                  value={filters.status && filters.status !== '' ? filters.status : 'all'}
+                  onValueChange={(value) => applyFilters({ status: value === 'all' ? '' : value })}
+                >
+                  <SelectTrigger className="w-full">
+                    {filters.status === 'actif' ? 'Actif' : filters.status === 'inactif' ? 'Inactif' : 'Statut'}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les statuts</SelectItem>
+                    <SelectItem value="actif">Actif</SelectItem>
+                    <SelectItem value="inactif">Inactif</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button type="button" variant="outline" onClick={resetFilters}>
+                  Réinitialiser
+                </Button>
+              </div>
+            </div>
+
             <div className="rounded-lg border border-border/60">
               <Table>
                 <TableHeader>

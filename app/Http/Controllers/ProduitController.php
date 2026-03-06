@@ -22,22 +22,24 @@ class ProduitController extends Controller
     }
     public function index(Request $request)
     {
-        $filters = $request->only([
-            'name',
-            'code_barre',
-            'category',
-            'fournisseur',
-            'prix_min',
-            'prix_max',
-        ]);
+        $filters = [
+            'name' => trim((string) $request->input('name', '')),
+            'code_barre' => trim((string) $request->input('code_barre', '')),
+            'category' => trim((string) $request->input('category', '')),
+            'fournisseur' => trim((string) $request->input('fournisseur', '')),
+            'prix_min' => $request->input('prix_min', ''),
+            'prix_max' => $request->input('prix_max', ''),
+        ];
 
         $produits = Produit::query()
-            ->with('category', 'fournisseur')
+            ->with(['category:id,name', 'fournisseur:id,name'])
             ->leftJoin('stocks', function ($join) {
                 $join->on('stocks.produit_id', '=', 'produits.id')
                     ->where('stocks.location_type', '=', 'depot')
                     ->whereNull('stocks.chantier_id');
             })
+            ->leftJoin('product_categories', 'product_categories.id', '=', 'produits.category_id')
+            ->leftJoin('fournisseurs', 'fournisseurs.id', '=', 'produits.fournisseur_id')
             ->when($filters['name'] ?? null, function ($query, $name) {
                 $query->where('produits.name', 'like', '%' . $name . '%');
             })
@@ -45,14 +47,10 @@ class ProduitController extends Controller
                 $query->where('produits.code_barre', 'like', '%' . $code . '%');
             })
             ->when($filters['category'] ?? null, function ($query, $category) {
-                $query->whereHas('category', function ($subQuery) use ($category) {
-                    $subQuery->where('name', 'like', '%' . $category . '%');
-                });
+                $query->where('product_categories.name', 'like', '%' . $category . '%');
             })
             ->when($filters['fournisseur'] ?? null, function ($query, $fournisseur) {
-                $query->whereHas('fournisseur', function ($subQuery) use ($fournisseur) {
-                    $subQuery->where('name', 'like', '%' . $fournisseur . '%');
-                });
+                $query->where('fournisseurs.name', 'like', '%' . $fournisseur . '%');
             })
             ->when($filters['prix_min'] ?? null, function ($query, $min) {
                 $query->where('produits.prix_vente', '>=', $min);
@@ -61,7 +59,7 @@ class ProduitController extends Controller
                 $query->where('produits.prix_vente', '<=', $max);
             })
             ->orderByDesc('produits.created_at')
-            ->paginate(15, ['produits.*', 'stocks.quantite'])
+            ->paginate(20, ['produits.*', 'stocks.quantite'])
             ->withQueryString();
 
         $nameOptions = Produit::query()->select('name')->distinct()->orderBy('name')->pluck('name');

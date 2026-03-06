@@ -117,9 +117,19 @@ const adminNavItems: NavItem[] = [
         ],
     },
     {
-        title: 'Achats',
+        title: 'Achats & Ventes',
         href: '/achats',
         icon: ShoppingCart,
+        children: [
+            {
+                title: 'Achats',
+                href: '/achats',
+            },
+            {
+                title: 'Ventes',
+                href: '/ventes',
+            },
+        ],
     },
     {
         title: 'Mouvements de stock',
@@ -231,6 +241,11 @@ const chefChantierNavItems: NavItem[] = [
         title: 'Paie Techniciens',
         href: '/paiements',
         icon: Wallet,
+    },
+    {
+        title: 'Charges',
+        href: '/charges',
+        icon: Receipt,
     },
     {
         title: 'Devis',

@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Achat extends Model
 {
+        use HasFactory;
+
+        public function suivieAchats()
+        {
+            return $this->hasMany(SuivieAchat::class);
+        }
     use HasFactory;
 
     protected $fillable = [
@@ -20,6 +26,9 @@ class Achat extends Model
         'total_tva',
         'total_ttc',
         'notes',
+        'mode_paiement', // Added for saving payment method
+        // 'montant_paye',
+        // 'reste_a_payer',
     ];
 
     protected $casts = [
@@ -65,5 +74,17 @@ class Achat extends Model
     public function items()
     {
         return $this->hasMany(AchatItem::class);
+    }
+
+    public const STATUTS = [
+        'en_attente' => 'En attente',
+        'partiel' => 'Payé partiellement',
+        'paye' => 'Payé',
+        'annule' => 'Annulé',
+    ];
+
+    public function getStatutLabelAttribute(): string
+    {
+        return self::STATUTS[$this->statut] ?? $this->statut;
     }
 }
