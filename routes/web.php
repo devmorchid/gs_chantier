@@ -39,6 +39,8 @@ use App\Http\Controllers\DevisController;
 use App\Http\Controllers\EquipeController;
 use App\Http\Controllers\FactureController;
 use App\Http\Controllers\PaiementTechnicienController;
+use App\Http\Controllers\ChargeController;
+use App\Http\Controllers\StatistiquesController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\ServiceDetailController;
 use App\Http\Controllers\TechnicienController;
@@ -54,6 +56,7 @@ use BaconQrCode\Renderer\Image\GdImageBackEnd;
 use BaconQrCode\Writer;
 
 use App\Models\Cheque;
+use App\Http\Controllers\ChequeController;
 
 use App\Http\Controllers\PointageMoisController;
 // Pointage mensuel (présence techniciens)
@@ -245,6 +248,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('factures.pdf-stream');
     });
 
+    // Charges (Admin et Chef de chantier)
+    Route::middleware(['role:admin|chef_chantier'])->group(function () {
+        Route::resource('charges', ChargeController::class);
+        Route::get('charges/{charge}/pdf', [ChargeController::class, 'pdf'])->name('charges.pdf');
+    });
+
+    // Statistiques (Admin uniquement)
+    Route::middleware(['role:admin'])->group(function () {
+        Route::get('statistiques', [StatistiquesController::class, 'index'])->name('statistiques.index');
+        Route::get('statistiques/chantiers', [StatistiquesController::class, 'chantiers'])->name('statistiques.chantiers');
+        Route::get('statistiques/ventes', [StatistiquesController::class, 'ventes'])->name('statistiques.ventes');
+        Route::get('statistiques/achats', [StatistiquesController::class, 'achats'])->name('statistiques.achats');
+        Route::get('statistiques/paiements', [StatistiquesController::class, 'paiements'])->name('statistiques.paiements');
+        Route::get('statistiques/clients', [StatistiquesController::class, 'clients'])->name('statistiques.clients');
+        Route::get('statistiques/fournisseurs', [StatistiquesController::class, 'fournisseurs'])->name('statistiques.fournisseurs');
+    });
+
     // Paiements Techniciens (Admin et Chef de chantier)
     Route::middleware(['role:admin|chef_chantier'])->prefix('paiements')->group(function () {
         Route::get('/', [PaiementTechnicienController::class, 'index'])->name('paiements.index');
@@ -262,25 +282,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('mes-chantiers/{chantier}', [ChantierController::class, 'show'])->name('mes-chantiers.show');
     });
 
-    Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
-        Route::get('cheques/dashboard', function () {
-            $a_encaisser = Cheque::where('direction', 'in')->where('status', 'en_attente')->count();
-            $a_payer = Cheque::where('direction', 'out')->where('status', 'en_attente')->count();
-            $en_attente = Cheque::where('status', 'en_attente')->count();
-            $total_encaissé_mois = Cheque::where('direction', 'in')
-                ->where('status', 'encaisse')
-                ->whereMonth('issue_date', now()->month)
-                ->whereYear('issue_date', now()->year)
-                ->sum('amount');
-            return Inertia::render('cheques/dashboard', [
-                'stats' => [
-                    'a_encaisser' => $a_encaisser,
-                    'a_payer' => $a_payer,
-                    'en_attente' => $en_attente,
-                    'total_encaissé_mois' => $total_encaissé_mois,
-                ]
-            ]);
-        })->name('cheques.dashboard');
+    // Chèques (Admin)
+    Route::middleware(['role:admin'])->group(function () {
+        Route::get('cheques', [ChequeController::class, 'index'])->name('cheques.index');
+        Route::get('cheques/dashboard', [ChequeController::class, 'dashboard'])->name('cheques.dashboard');
+        Route::get('cheques/notifications', [\App\Http\Controllers\ChequeNotificationController::class, 'index'])->name('cheques.notifications');
+        Route::patch('cheques/{cheque}/statut', [ChequeController::class, 'updateStatut'])->name('cheques.update-statut');
+        Route::delete('cheques/{cheque}', [ChequeController::class, 'destroy'])->name('cheques.destroy');
     });
 });
 

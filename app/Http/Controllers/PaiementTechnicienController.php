@@ -101,6 +101,19 @@ class PaiementTechnicienController extends Controller
             'reste_a_payer'     => round($resteAPayer, 2),
             'statut'            => $statut,
             'paiement_id'       => $paiement?->id,
+            'mode_paiement'     => $paiement?->mode_paiement,
+            'mode_paiement_label' => $paiement ? (PaiementTechnicien::MODES_PAIEMENT[$paiement->mode_paiement] ?? $paiement->mode_paiement) : null,
+            // Chèque
+            'cheque_numero'        => $paiement?->cheque_numero,
+            'cheque_date_echeance' => $paiement?->cheque_date_echeance?->format('d/m/Y'),
+            'cheque_banque'        => $paiement?->cheque_banque,
+            'cheque_image'         => $paiement?->cheque_image,
+            // Virement
+            'virement_reference'   => $paiement?->virement_reference,
+            'virement_banque'      => $paiement?->virement_banque,
+            // Transfert mobile
+            'transfert_numero'     => $paiement?->transfert_numero,
+            'transfert_service'    => $paiement?->transfert_service,
         ];
     }
 
@@ -325,10 +338,20 @@ class PaiementTechnicienController extends Controller
             'month'           => 'required|integer|min:1|max:12',
             'year'            => 'required|integer|min:2020',
             'montant_paye'    => 'required|numeric|min:0',
-            'mode_paiement'   => 'required|in:especes,virement,cheque,autre',
+            'mode_paiement'   => 'required|in:especes,virement,cheque,wafa_cash,cash_plus,autre',
             'date_paiement'   => 'required|date',
             'chantier_id'     => 'nullable|exists:chantiers,id',
             'notes'           => 'nullable|string|max:500',
+            // Chèque
+            'cheque_numero'        => 'nullable|required_if:mode_paiement,cheque|string|max:50',
+            'cheque_date_echeance' => 'nullable|required_if:mode_paiement,cheque|date',
+            'cheque_banque'        => 'nullable|string|max:100',
+            'cheque_image'         => 'nullable|image|max:5120',
+            // Virement
+            'virement_reference'   => 'nullable|required_if:mode_paiement,virement|string|max:100',
+            'virement_banque'      => 'nullable|string|max:100',
+            // Transfert mobile (Wafa Cash / Cash Plus)
+            'transfert_numero'     => 'nullable|required_if:mode_paiement,wafa_cash,cash_plus|string|max:50',
         ]);
 
         $fiche   = $this->calcFichePaie($technicien, $data['month'], $data['year'], $data['chantier_id'] ?? null);
@@ -345,6 +368,18 @@ class PaiementTechnicienController extends Controller
         $reste     = max(0, $net - $totalPaye);
         $statut    = $reste <= 0 ? 'paye' : ($totalPaye > 0 ? 'partiellement_paye' : 'non_paye');
 
+        // Handle cheque image upload
+        $chequeImagePath = $paiement->cheque_image;
+        if ($request->hasFile('cheque_image')) {
+            $chequeImagePath = $request->file('cheque_image')->store('cheques', 'public');
+        }
+
+        // Set transfert_service based on mode
+        $transfertService = null;
+        if (in_array($data['mode_paiement'], ['wafa_cash', 'cash_plus'])) {
+            $transfertService = $data['mode_paiement'];
+        }
+
         $paiement->fill([
             'jours_travailles'   => $fiche['jours_travailles'],
             'salaire_journalier' => $fiche['salaire_journalier'],
@@ -360,7 +395,35 @@ class PaiementTechnicienController extends Controller
             'date_paiement'      => $data['date_paiement'],
             'notes'              => $data['notes'] ?? null,
             'created_by'         => auth()->id(),
+            // Chèque
+            'cheque_numero'        => $data['cheque_numero'] ?? null,
+            'cheque_date_echeance' => $data['cheque_date_echeance'] ?? null,
+            'cheque_banque'        => $data['cheque_banque'] ?? null,
+            'cheque_image'         => $chequeImagePath,
+            // Virement
+            'virement_reference'   => $data['virement_reference'] ?? null,
+            'virement_banque'      => $data['virement_banque'] ?? null,
+            // Transfert mobile
+            'transfert_numero'     => $data['transfert_numero'] ?? null,
+            'transfert_service'    => $transfertService,
         ])->save();
+
+        // Auto-create cheque record if payment by cheque
+        if ($data['mode_paiement'] === 'cheque') {
+            \App\Models\Cheque::create([
+                'direction' => 'decaissement',
+                'source_type' => 'paiement_technicien',
+                'source_id' => $paiement->id,
+                'bank_name' => $data['cheque_banque'] ?? '',
+                'cheque_number' => $data['cheque_numero'] ?? '',
+                'amount' => $data['montant_paye'],
+                'issue_date' => $data['date_paiement'],
+                'due_date' => $data['cheque_date_echeance'] ?? $data['date_paiement'],
+                'status' => 'en_attente',
+                'beneficiaire' => $technicien->nom . ' ' . $technicien->prenom,
+                'motif' => 'Paie ' . $technicien->nom . ' - ' . $periode,
+            ]);
+        }
 
         return back()->with('success', 'Paiement enregistré avec succès');
     }

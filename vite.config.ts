@@ -36,4 +36,8 @@ export default defineConfig({
     optimizeDeps: {
         include: ['qrcode.react'],
     },
+    server: {
+        port: 5173,
+        strictPort: true,
+    },
 });

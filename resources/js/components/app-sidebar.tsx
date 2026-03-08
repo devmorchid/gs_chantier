@@ -173,8 +173,21 @@ const adminNavItems: NavItem[] = [
     },
     {
         title: 'Chèques',
-        href: '/cheques/dashboard',
         icon: CreditCard,
+        children: [
+            {
+                title: 'Suivi',
+                href: '/cheques',
+            },
+            {
+                title: 'Dashboard',
+                href: '/cheques/dashboard',
+            },
+            {
+                title: 'Alertes',
+                href: '/cheques/notifications',
+            },
+        ],
     },
 ];
 

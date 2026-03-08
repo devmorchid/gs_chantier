@@ -229,7 +229,7 @@ class AchatController extends Controller
 				// Insert cheque info if mode_paiement is cheque
 				if (($validated['mode_paiement'] ?? '') === 'cheque') {
 					\App\Models\Cheque::create([
-						'direction' => 'out',
+						'direction' => 'decaissement',
 						'source_type' => 'achat',
 						'source_id' => $achat->fournisseur_id,
 						'bank_name' => $validated['cheque_banque'] ?? '',
@@ -238,6 +238,8 @@ class AchatController extends Controller
 						'issue_date' => now()->toDateString(),
 						'due_date' => $validated['cheque_echeance'] ?? now()->toDateString(),
 						'status' => 'en_attente',
+						'beneficiaire' => $achat->fournisseur?->nom ?? null,
+						'motif' => 'Achat #' . $achat->id,
 					]);
 				}
 				// Insert virement info if mode_paiement is virement
@@ -360,9 +362,9 @@ class AchatController extends Controller
 			   // Si mode_paiement = cheque, enregistrer dans cheques (aligné avec store)
 			   if ($validated['mode_paiement'] === 'cheque') {
 				   \App\Models\Cheque::create([
-					   'direction' => 'out', // achat = paiement fournisseur
+					   'direction' => 'decaissement',
 					   'source_type' => 'achat',
-					   'source_id' => $achat->fournisseur_id, // aligné avec store()
+					   'source_id' => $achat->fournisseur_id,
 					   'bank_name' => $validated['cheque_banque'] ?? '',
 					   'cheque_number' => $validated['cheque_numero'] ?? '',
 					   'amount' => $montant,
@@ -370,6 +372,8 @@ class AchatController extends Controller
 					   'due_date' => $validated['cheque_echeance'] ?? now()->toDateString(),
 					   'status' => 'en_attente',
 					   'titulaire' => $validated['cheque_titulaire'] ?? null,
+					   'beneficiaire' => $achat->fournisseur?->nom ?? null,
+					   'motif' => 'Achat #' . $achat->id,
 				   ]);
 			   }
 

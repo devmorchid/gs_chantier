@@ -288,6 +288,8 @@
             <span>{{ number_format($fiche['net_a_payer'], 2, '.', ' ') }} DH</span>
         </div>
     </div>
+<!-- Statut du règlement + Détails paiement -->
+<div class="calcul-box">
     <div class="calcul-card green-card">
         <div class="calcul-title">Statut du règlement</div>
         <div class="calcul-row">
@@ -303,6 +305,52 @@
             <span class="text-orange">{{ number_format($fiche['reste_a_payer'], 2, '.', ' ') }} DH</span>
         </div>
     </div>
+
+    @if(!empty($fiche['mode_paiement']))
+    <div class="calcul-card blue-card">
+        <div class="calcul-title">Mode de paiement</div>
+        <div class="calcul-row">
+            <span>Mode</span>
+            <span style="font-weight:bold;">{{ $fiche['mode_paiement_label'] ?? $fiche['mode_paiement'] }}</span>
+        </div>
+        @if($fiche['mode_paiement'] === 'cheque')
+            <div class="calcul-row">
+                <span>N° chèque</span>
+                <span style="font-weight:bold; font-family: monospace;">{{ $fiche['cheque_numero'] ?? '—' }}</span>
+            </div>
+            <div class="calcul-row">
+                <span>Échéance</span>
+                <span>{{ $fiche['cheque_date_echeance'] ?? '—' }}</span>
+            </div>
+            @if(!empty($fiche['cheque_banque']))
+            <div class="calcul-row">
+                <span>Banque</span>
+                <span>{{ $fiche['cheque_banque'] }}</span>
+            </div>
+            @endif
+        @elseif($fiche['mode_paiement'] === 'virement')
+            <div class="calcul-row">
+                <span>Référence</span>
+                <span style="font-weight:bold; font-family: monospace;">{{ $fiche['virement_reference'] ?? '—' }}</span>
+            </div>
+            @if(!empty($fiche['virement_banque']))
+            <div class="calcul-row">
+                <span>Banque</span>
+                <span>{{ $fiche['virement_banque'] }}</span>
+            </div>
+            @endif
+        @elseif(in_array($fiche['mode_paiement'], ['wafa_cash', 'cash_plus']))
+            <div class="calcul-row">
+                <span>Service</span>
+                <span style="font-weight:bold;">{{ $fiche['mode_paiement'] === 'wafa_cash' ? 'Wafa Cash' : 'Cash Plus' }}</span>
+            </div>
+            <div class="calcul-row">
+                <span>N° transaction</span>
+                <span style="font-weight:bold; font-family: monospace;">{{ $fiche['transfert_numero'] ?? '—' }}</span>
+            </div>
+        @endif
+    </div>
+    @endif
 </div>
 
 <!-- Signatures -->

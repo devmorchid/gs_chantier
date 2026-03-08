@@ -11,7 +11,7 @@ import type { BreadcrumbItem } from '@/types';
 import { Head, router, useForm, Link } from '@inertiajs/react';
 import {
     CalendarDays, Clock, Wallet, TrendingDown, Plus, FileText,
-    CheckCircle2, AlertCircle, ChevronLeft, Printer,
+    CheckCircle2, AlertCircle, ChevronLeft, Printer, CreditCard, Banknote, Smartphone, Image,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,19 @@ interface Fiche {
     reste_a_payer: number;
     statut: string;
     paiement_id?: number;
+    mode_paiement?: string;
+    mode_paiement_label?: string;
+    // Chèque
+    cheque_numero?: string;
+    cheque_date_echeance?: string;
+    cheque_banque?: string;
+    cheque_image?: string;
+    // Virement
+    virement_reference?: string;
+    virement_banque?: string;
+    // Transfert mobile
+    transfert_numero?: string;
+    transfert_service?: string;
 }
 
 interface Pointage {
@@ -323,7 +336,14 @@ function PayerModal({ technicienId, fiche, month, year, chantierId, modes_paieme
     modes_paiement: Record<string, string>,
 }) {
     const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors, reset } = useForm<{
+        month: string; year: string; montant_paye: string; mode_paiement: string;
+        date_paiement: string; chantier_id: string; notes: string;
+        cheque_numero: string; cheque_date_echeance: string; cheque_banque: string;
+        cheque_image: File | null;
+        virement_reference: string; virement_banque: string;
+        transfert_numero: string;
+    }>({
         month: String(month),
         year: String(year),
         montant_paye: String(fiche.reste_a_payer),
@@ -331,13 +351,22 @@ function PayerModal({ technicienId, fiche, month, year, chantierId, modes_paieme
         date_paiement: new Date().toISOString().split('T')[0],
         chantier_id: chantierId ?? '',
         notes: '',
+        cheque_numero: '',
+        cheque_date_echeance: '',
+        cheque_banque: '',
+        cheque_image: null,
+        virement_reference: '',
+        virement_banque: '',
+        transfert_numero: '',
     });
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         post(`/paiements/technicien/${technicienId}/payer`, {
+            forceFormData: true,
             onSuccess: () => { setOpen(false); reset(); },
         });
     };
+    const mode = data.mode_paiement;
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -346,7 +375,7 @@ function PayerModal({ technicienId, fiche, month, year, chantierId, modes_paieme
                     {fiche.statut === 'non_paye' ? 'Payer' : 'Paiement partiel'}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Enregistrer un paiement</DialogTitle></DialogHeader>
                 <div className="mb-4 rounded-lg bg-blue-50 p-3">
                     <div className="flex justify-between text-sm">
@@ -385,6 +414,63 @@ function PayerModal({ technicienId, fiche, month, year, chantierId, modes_paieme
                             </SelectContent>
                         </Select>
                     </div>
+
+                    {/* ── Chèque fields ── */}
+                    {mode === 'cheque' && (
+                        <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+                            <p className="text-xs font-semibold text-blue-700 uppercase">Détails du chèque</p>
+                            <div>
+                                <Label>N° du chèque *</Label>
+                                <Input value={data.cheque_numero} onChange={(e) => setData('cheque_numero', e.target.value)} placeholder="Ex: 0012345" required />
+                                {errors.cheque_numero && <p className="text-xs text-red-500">{errors.cheque_numero}</p>}
+                            </div>
+                            <div>
+                                <Label>Date d'échéance *</Label>
+                                <Input type="date" value={data.cheque_date_echeance} onChange={(e) => setData('cheque_date_echeance', e.target.value)} required />
+                                {errors.cheque_date_echeance && <p className="text-xs text-red-500">{errors.cheque_date_echeance}</p>}
+                            </div>
+                            <div>
+                                <Label>Banque</Label>
+                                <Input value={data.cheque_banque} onChange={(e) => setData('cheque_banque', e.target.value)} placeholder="Ex: Attijariwafa Bank" />
+                            </div>
+                            <div>
+                                <Label>Scanner le chèque (photo)</Label>
+                                <Input type="file" accept="image/*" onChange={(e) => setData('cheque_image', e.target.files?.[0] ?? null)} />
+                                {errors.cheque_image && <p className="text-xs text-red-500">{errors.cheque_image}</p>}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Virement fields ── */}
+                    {mode === 'virement' && (
+                        <div className="space-y-3 rounded-lg border border-purple-200 bg-purple-50/50 p-3">
+                            <p className="text-xs font-semibold text-purple-700 uppercase">Détails du virement</p>
+                            <div>
+                                <Label>Référence du virement *</Label>
+                                <Input value={data.virement_reference} onChange={(e) => setData('virement_reference', e.target.value)} placeholder="Ex: VIR-20260307-001" required />
+                                {errors.virement_reference && <p className="text-xs text-red-500">{errors.virement_reference}</p>}
+                            </div>
+                            <div>
+                                <Label>Banque</Label>
+                                <Input value={data.virement_banque} onChange={(e) => setData('virement_banque', e.target.value)} placeholder="Ex: CIH Bank" />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Wafa Cash / Cash Plus fields ── */}
+                    {(mode === 'wafa_cash' || mode === 'cash_plus') && (
+                        <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/50 p-3">
+                            <p className="text-xs font-semibold text-orange-700 uppercase">
+                                Détails {mode === 'wafa_cash' ? 'Wafa Cash' : 'Cash Plus'}
+                            </p>
+                            <div>
+                                <Label>N° de transaction / téléphone *</Label>
+                                <Input value={data.transfert_numero} onChange={(e) => setData('transfert_numero', e.target.value)} placeholder="Ex: 0612345678" required />
+                                {errors.transfert_numero && <p className="text-xs text-red-500">{errors.transfert_numero}</p>}
+                            </div>
+                        </div>
+                    )}
+
                     <div>
                         <Label>Date du paiement</Label>
                         <Input type="date" value={data.date_paiement} onChange={(e) => setData('date_paiement', e.target.value)} required />
@@ -739,6 +825,89 @@ export default function PaiementsShow({
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Détails du mode de paiement */}
+                {fiche.mode_paiement && fiche.statut !== 'non_paye' && (
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-sm">
+                                <CreditCard className="h-4 w-4" /> Détails du paiement — {fiche.mode_paiement_label}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                {/* Chèque */}
+                                {fiche.mode_paiement === 'cheque' && (
+                                    <>
+                                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                                            <p className="text-xs font-semibold text-blue-700 mb-1">N° du chèque</p>
+                                            <p className="text-sm font-mono font-bold">{fiche.cheque_numero ?? '—'}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                                            <p className="text-xs font-semibold text-blue-700 mb-1">Date d'échéance</p>
+                                            <p className="text-sm font-bold">{fiche.cheque_date_echeance ?? '—'}</p>
+                                        </div>
+                                        {fiche.cheque_banque && (
+                                            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                                                <p className="text-xs font-semibold text-blue-700 mb-1">Banque</p>
+                                                <p className="text-sm font-bold">{fiche.cheque_banque}</p>
+                                            </div>
+                                        )}
+                                        {fiche.cheque_image && (
+                                            <div className="col-span-full">
+                                                <p className="text-xs font-semibold text-blue-700 mb-2 flex items-center gap-1">
+                                                    <Image className="h-3.5 w-3.5" /> Photo du chèque
+                                                </p>
+                                                <a href={`/storage/${fiche.cheque_image}`} target="_blank" rel="noreferrer">
+                                                    <img src={`/storage/${fiche.cheque_image}`} alt="Chèque scanné" className="max-w-sm rounded-lg border shadow-sm hover:shadow-md transition-shadow" />
+                                                </a>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                                {/* Virement */}
+                                {fiche.mode_paiement === 'virement' && (
+                                    <>
+                                        <div className="rounded-lg border border-purple-200 bg-purple-50 p-3">
+                                            <p className="text-xs font-semibold text-purple-700 mb-1">Référence du virement</p>
+                                            <p className="text-sm font-mono font-bold">{fiche.virement_reference ?? '—'}</p>
+                                        </div>
+                                        {fiche.virement_banque && (
+                                            <div className="rounded-lg border border-purple-200 bg-purple-50 p-3">
+                                                <p className="text-xs font-semibold text-purple-700 mb-1">Banque</p>
+                                                <p className="text-sm font-bold">{fiche.virement_banque}</p>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                                {/* Wafa Cash / Cash Plus */}
+                                {(fiche.mode_paiement === 'wafa_cash' || fiche.mode_paiement === 'cash_plus') && (
+                                    <>
+                                        <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                                            <p className="text-xs font-semibold text-orange-700 mb-1 flex items-center gap-1">
+                                                <Smartphone className="h-3.5 w-3.5" /> Service
+                                            </p>
+                                            <p className="text-sm font-bold">{fiche.mode_paiement === 'wafa_cash' ? 'Wafa Cash' : 'Cash Plus'}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                                            <p className="text-xs font-semibold text-orange-700 mb-1">N° transaction / téléphone</p>
+                                            <p className="text-sm font-mono font-bold">{fiche.transfert_numero ?? '—'}</p>
+                                        </div>
+                                    </>
+                                )}
+                                {/* Espèces */}
+                                {fiche.mode_paiement === 'especes' && (
+                                    <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                                        <p className="text-xs font-semibold text-green-700 mb-1 flex items-center gap-1">
+                                            <Banknote className="h-3.5 w-3.5" /> Paiement en espèces
+                                        </p>
+                                        <p className="text-sm font-bold">{fmt(fiche.montant_paye)} DH</p>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Historique Paiements */}
                 {historique_paiements.length > 0 && (
