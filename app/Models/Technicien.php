@@ -9,17 +9,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Technicien extends Model
 {
-    // Génère un QR code unique pour chaque technicien
-    public static function generateQrCodes()
-    {
-        $all = self::all();
-        foreach ($all as $tech) {
-            if (!$tech->qr_code) {
-                $tech->qr_code = 'TECH-' . str_pad($tech->id, 4, '0', STR_PAD_LEFT);
-                $tech->save();
-            }
-        }
-    }
     use HasFactory;
 
     /**
@@ -42,8 +31,6 @@ class Technicien extends Model
         'disponible',
         'notes',
         'created_by',
-        'photo_reference',
-        'qr_code',
     ];
 
     protected $casts = [
@@ -66,18 +53,6 @@ class Technicien extends Model
         'manoeuvre' => 'Manœuvre',
         'autre' => 'Autre',
     ];
-
-    public const TYPES_CONTRAT = [
-        'cnss'          => 'CNSS (Déclaré)',
-        'journalier'    => 'Journalier',
-        'contrat'       => 'Contractuel',
-        'sous_traitant' => 'Sous-traitant',
-    ];
-
-    public function getTypeContratLabelAttribute(): string
-    {
-        return self::TYPES_CONTRAT[$this->type_contrat] ?? $this->type_contrat ?? '-';
-    }
 
     /**
      * Nom complet
@@ -111,32 +86,5 @@ class Technicien extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
-    }
-
-    public function chantiers()
-    {
-        return $this->belongsToMany(Chantier::class, 'chantier_technicien')
-                    ->withPivot(['salaire_journalier', 'heure_debut', 'heure_fin', 'actif', 'date_affectation', 'date_fin'])
-                    ->withTimestamps();
-    }
-
-    public function avances()
-    {
-        return $this->hasMany(AvanceTechnicien::class);
-    }
-
-    public function deductions()
-    {
-        return $this->hasMany(Deduction::class);
-    }
-
-    public function primes()
-    {
-        return $this->hasMany(Prime::class);
-    }
-
-    public function paiements()
-    {
-        return $this->hasMany(PaiementTechnicien::class);
     }
 }

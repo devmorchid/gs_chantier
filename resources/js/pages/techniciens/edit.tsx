@@ -21,7 +21,6 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, Save } from 'lucide-react';
-import { useRef, useState } from 'react';
 
 interface Technicien {
     id: number;
@@ -33,7 +32,6 @@ interface Technicien {
     salaire_journalier: number | null;
     disponible: boolean;
     notes: string | null;
-    photo: string | null;
 }
 
 interface Props {
@@ -49,9 +47,6 @@ export default function TechnicienEdit({ technicien, specialites }: Props) {
         { title: 'Modifier', href: `/techniciens/${technicien.id}/edit` },
     ];
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [preview, setPreview] = useState<string | null>(null);
-
     const { data, setData, patch, processing, errors } = useForm({
         nom: technicien.nom,
         prenom: technicien.prenom || '',
@@ -61,22 +56,11 @@ export default function TechnicienEdit({ technicien, specialites }: Props) {
         salaire_journalier: technicien.salaire_journalier?.toString() || '',
         disponible: technicien.disponible,
         notes: technicien.notes || '',
-        photo: null,
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        patch(`/techniciens/${technicien.id}`, { forceFormData: true });
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setData('photo', file);
-            const reader = new FileReader();
-            reader.onloadend = () => setPreview(reader.result as string);
-            reader.readAsDataURL(file);
-        }
+        patch(`/techniciens/${technicien.id}`);
     };
 
     return (
@@ -209,25 +193,6 @@ export default function TechnicienEdit({ technicien, specialites }: Props) {
                                     />
                                     {errors.salaire_journalier && (
                                         <p className="text-sm text-red-500">{errors.salaire_journalier}</p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="photo">Photo</Label>
-                                    <Input
-                                        id="photo"
-                                        type="file"
-                                        accept="image/*"
-                                        ref={fileInputRef}
-                                        onChange={handleFileChange}
-                                    />
-                                    {preview ? (
-                                        <img src={preview} alt="Preview" className="w-24 h-24 rounded-full mt-2 object-cover border-2 border-blue-400" />
-                                    ) : technicien.photo_reference ? (
-                                        <img src={technicien.photo_reference} alt="Photo actuelle" className="w-24 h-24 rounded-full mt-2 object-cover border-2 border-gray-400" />
-                                    ) : null}
-                                    {errors.photo && (
-                                        <p className="text-sm text-red-500">{errors.photo}</p>
                                     )}
                                 </div>
 

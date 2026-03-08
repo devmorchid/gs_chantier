@@ -20,7 +20,6 @@ class Chantier extends Model
         'localisation',  // Localisation générale (ville + quartier) - pour les listes
         'latitude',      // Coordonnées GPS
         'longitude',     // Coordonnées GPS
-        'radius',        // Rayon autorisé en mètres pour geofencing
         'adresse',       // Adresse détaillée (rue, numéro, résidence...) - pour les documents
         'date_debut',
         'date_fin_prevue',
@@ -130,69 +129,5 @@ class Chantier extends Model
     public function scopeTermine($query)
     {
         return $query->where('statut', 'termine');
-    }
-
-    /**
-     * حساب المسافة بين نقطتين GPS باستخدام Haversine
-     * @return float المسافة بالمتر
-     */
-    public static function calculateDistance(float $lat1, float $lon1, float $lat2, float $lon2): float
-    {
-        $earthRadius = 6371000; // نصف قطر الأرض بالمتر
-
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLon = deg2rad($lon2 - $lon1);
-
-        $a = sin($dLat / 2) * sin($dLat / 2) +
-            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-            sin($dLon / 2) * sin($dLon / 2);
-
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-
-        return $earthRadius * $c;
-    }
-
-    /**
-     * التحقق هل النقطة داخل نطاق الورشة
-     */
-    public function isWithinRadius(float $latitude, float $longitude): bool
-    {
-        if (!$this->latitude || !$this->longitude) {
-            return true; // إذا لم يتم تحديد GPS، نسمح بالدخول
-        }
-
-        $distance = self::calculateDistance(
-            $this->latitude,
-            $this->longitude,
-            $latitude,
-            $longitude
-        );
-
-        return $distance <= ($this->radius ?? 100);
-    }
-
-    /**
-     * حساب المسافة من نقطة معينة
-     */
-    public function getDistanceFrom(float $latitude, float $longitude): float
-    {
-        if (!$this->latitude || !$this->longitude) {
-            return 0;
-        }
-
-        return self::calculateDistance(
-            $this->latitude,
-            $this->longitude,
-            $latitude,
-            $longitude
-        );
-    }
-
-    /**
-     * هل الورشة بها إحداثيات GPS؟
-     */
-    public function hasGpsCoordinates(): bool
-    {
-        return $this->latitude !== null && $this->longitude !== null;
     }
 }

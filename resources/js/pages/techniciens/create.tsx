@@ -21,8 +21,6 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, Save } from 'lucide-react';
-import { useRef } from 'react';
-import { useState } from 'react';
 
 interface Props {
     specialites: Record<string, string>;
@@ -44,25 +42,11 @@ export default function TechnicienCreate({ specialites }: Props) {
         salaire_journalier: '',
         disponible: true,
         notes: '',
-        photo: null,
     });
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [preview, setPreview] = useState<string | null>(null);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post('/techniciens', { forceFormData: true });
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setData('photo', file);
-            const reader = new FileReader();
-            reader.onloadend = () => setPreview(reader.result as string);
-            reader.readAsDataURL(file);
-        }
+        post('/techniciens');
     };
 
     return (
@@ -222,23 +206,6 @@ export default function TechnicienCreate({ specialites }: Props) {
                                     />
                                     {errors.notes && (
                                         <p className="text-sm text-red-500">{errors.notes}</p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="photo">Photo</Label>
-                                    <Input
-                                        id="photo"
-                                        type="file"
-                                        accept="image/*"
-                                        ref={fileInputRef}
-                                        onChange={handleFileChange}
-                                    />
-                                    {preview && (
-                                        <img src={preview} alt="Preview" className="w-24 h-24 rounded-full mt-2 object-cover border-2 border-blue-400" />
-                                    )}
-                                    {errors.photo && (
-                                        <p className="text-sm text-red-500">{errors.photo}</p>
                                     )}
                                 </div>
                             </CardContent>

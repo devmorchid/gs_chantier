@@ -3,7 +3,6 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import { defineConfig } from 'vite';
-import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig({
     plugins: [
@@ -21,23 +20,8 @@ export default defineConfig({
         wayfinder({
             formVariants: true,
         }),
-        viteStaticCopy({
-            targets: [
-                {
-                    src: 'node_modules/qr-scanner/qr-scanner-worker.min.js',
-                    dest: '',
-                },
-            ],
-        }),
     ],
     esbuild: {
         jsx: 'automatic',
-    },
-    optimizeDeps: {
-        include: ['qrcode.react'],
-    },
-    server: {
-        port: 5173,
-        strictPort: true,
     },
 });

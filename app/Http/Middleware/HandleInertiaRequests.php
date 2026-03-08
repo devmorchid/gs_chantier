@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\Chantier;
-use App\Models\Technicien;
 use App\Models\StockTransferRequest;
 use App\Notifications\ChargeDecisionNotification;
 use App\Notifications\ChargeSubmittedNotification;
@@ -76,8 +75,6 @@ class HandleInertiaRequests extends Middleware
             ],
             'notificationCount' => $notificationCount,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-            'chantiers' => Chantier::select('id', 'nom')->get(),
-            'techniciens' => Technicien::select('id', 'nom', 'prenom')->get(),
         ];
     }
 }

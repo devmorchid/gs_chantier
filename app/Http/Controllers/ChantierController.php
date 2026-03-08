@@ -241,7 +241,7 @@ class ChantierController extends Controller
         $validated = $request->validate([
             'reference' => 'required|string|unique:chantiers',
             'nom' => 'required|string|max:255',
-            'localisation' => 'required|string|max:500',  // Adresse complète (GPS)
+            'localisation' => 'required|string|max:100',  // Ville + Quartier (ex: Casablanca – Sidi Maarouf)
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'adresse' => 'nullable|string|max:500',        // Adresse détaillée pour les documents
@@ -397,7 +397,7 @@ class ChantierController extends Controller
 
         $validated = $request->validate([
             'nom' => 'required|string|max:255',
-            'localisation' => 'required|string|max:500',  // Adresse complète (GPS)
+            'localisation' => 'required|string|max:100',  // Ville + Quartier
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'adresse' => 'nullable|string|max:500',        // Adresse détaillée

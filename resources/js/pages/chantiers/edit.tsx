@@ -52,7 +52,6 @@ interface Chantier {
     localisation: string;
     latitude: number | null;
     longitude: number | null;
-    radius: number;
     adresse: string | null;
     date_debut: string;
     date_fin_prevue: string | null;
@@ -137,7 +136,6 @@ export default function ChantierEdit({ chantier, responsables, clients, statuts,
         localisation: attempted?.localisation ?? chantier.localisation,
         latitude: attempted?.latitude ?? chantier.latitude,
         longitude: attempted?.longitude ?? chantier.longitude,
-        radius: chantier.radius ?? 100,
         adresse: attempted?.adresse ?? (chantier.adresse || ''),
         date_debut: attempted?.date_debut ?? chantier.date_debut,
         date_fin_prevue: attempted?.date_fin_prevue ?? (chantier.date_fin_prevue || ''),
@@ -290,31 +288,9 @@ export default function ChantierEdit({ chantier, responsables, clients, statuts,
                                     onChange={handleLocationChange}
                                     placeholder="Rechercher une adresse au Maroc..."
                                 />
-                                <p className="text-xs text-muted-foreground">
-                                    📍 = ouvrir la carte | ⊕ = utiliser ma position GPS actuelle
-                                </p>
+                                <p className="text-xs text-muted-foreground">Cliquez sur 📍 pour ouvrir la carte</p>
                                 {errors.localisation && (
                                     <p className="text-sm text-destructive">{errors.localisation}</p>
-                                )}
-                            </div>
-
-                            {/* Rayon GPS pour Geofencing */}
-                            <div className="space-y-2">
-                                <Label htmlFor="radius">Rayon GPS autorisé (mètres)</Label>
-                                <Input
-                                    id="radius"
-                                    type="number"
-                                    min="10"
-                                    max="1000"
-                                    value={data.radius}
-                                    onChange={(e) => setData('radius', parseInt(e.target.value) || 100)}
-                                    placeholder="100"
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Rayon de tolérance pour le pointage GPS (défaut: 100m). Les techniciens doivent être dans ce périmètre.
-                                </p>
-                                {errors.radius && (
-                                    <p className="text-sm text-destructive">{errors.radius}</p>
                                 )}
                             </div>
 

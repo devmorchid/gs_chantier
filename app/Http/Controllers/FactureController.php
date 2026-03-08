@@ -523,7 +523,6 @@ class FactureController extends Controller
             'reference' => 'nullable|string',
             'bank_name' => 'nullable|string',
             'cheque_number' => 'nullable|string',
-            'cheque_due_date' => 'nullable|date',
             'payment_date' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
@@ -533,23 +532,6 @@ class FactureController extends Controller
         }
 
         $facture->enregistrerPaiement($validated['montant'], $validated);
-
-        // Auto-create cheque record if payment by cheque
-        if (($validated['mode_paiement'] ?? '') === 'cheque') {
-            \App\Models\Cheque::create([
-                'direction' => 'encaissement',
-                'source_type' => 'facture',
-                'source_id' => $facture->id,
-                'bank_name' => $validated['bank_name'] ?? '',
-                'cheque_number' => $validated['cheque_number'] ?? '',
-                'amount' => $validated['montant'],
-                'issue_date' => $validated['payment_date'] ?? now()->toDateString(),
-                'due_date' => $validated['cheque_due_date'] ?? $validated['payment_date'] ?? now()->toDateString(),
-                'status' => 'en_attente',
-                'beneficiaire' => $facture->chantier?->client?->nom ?? null,
-                'motif' => 'Facture ' . $facture->reference,
-            ]);
-        }
 
         return back()->with('success', 'Paiement enregistré avec succès.');
     }
