@@ -16,6 +16,7 @@ class Attendance extends Model
         'photo_path',
         'status',
         'validated_by',
+        'is_in', // 1 = entré, 0 = sorti
     ];
 
     public function chantier()

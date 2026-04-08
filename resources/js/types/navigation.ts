@@ -12,8 +12,6 @@ export type NavItem = {
     icon?: LucideIcon | null;
     isActive?: boolean;
     badge?: number;
-    children?: Array<{
-        title: string;
-        href: NonNullable<InertiaLinkProps['href']>;
-    }>;
+        children?: NavItem[];
+    };
 };

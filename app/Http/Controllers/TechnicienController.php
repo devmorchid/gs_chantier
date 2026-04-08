@@ -147,12 +147,43 @@ class TechnicienController extends Controller
             'salaire_journalier' => 'nullable|numeric|min:0',
             'disponible' => 'boolean',
             'notes' => 'nullable|string',
+            'photo' => 'nullable|image|max:2048',
         ]);
 
         // حفظ من أنشأ التقني
         $validated['created_by'] = $request->user()->id;
 
-        Technicien::create($validated);
+
+        // Gérer l'upload de la photo
+        if ($request->hasFile('photo')) {
+            $path = $request->file('photo')->store('techniciens', 'public');
+            $validated['photo_reference'] = '/storage/' . $path;
+        }
+
+        $technicien = Technicien::create($validated);
+
+        // Générer qr_code unique
+        $technicien->qr_code = 'TECH-' . str_pad($technicien->id, 4, '0', STR_PAD_LEFT);
+
+        // Générer image QR code et la sauvegarder
+        try {
+            $qrPath = 'qrcodes/' . $technicien->qr_code . '.png';
+            $qrFullPath = storage_path('app/public/' . $qrPath);
+            // Générer QR code avec endroid/qr-code
+            $qr = new \Endroid\QrCode\QrCode($technicien->qr_code);
+            $qr->setSize(300);
+            $writer = new \Endroid\QrCode\Writer\PngWriter();
+            $result = $writer->write($qr);
+            // S'assurer que le dossier existe
+            \Illuminate\Support\Facades\Storage::disk('public')->makeDirectory('qrcodes');
+            file_put_contents($qrFullPath, $result->getString());
+        } catch (\Throwable $e) {
+            // Log erreur mais continuer
+            \Log::error('Erreur génération QR: ' . $e->getMessage());
+        }
+
+
+        $technicien->save();
 
         return redirect()->route('techniciens.index')
             ->with('success', 'Technicien créé avec succès.');
@@ -186,6 +217,7 @@ class TechnicienController extends Controller
                 'disponible' => $technicien->disponible,
                 'notes' => $technicien->notes,
                 'created_at' => $technicien->created_at->toISOString(),
+                'qr_code' => $technicien->qr_code,
             ],
             'equipes' => $technicien->equipes->map(fn($equipe) => [
                 'id' => $equipe->id,
@@ -195,6 +227,64 @@ class TechnicienController extends Controller
                 'services_count' => $equipe->services->count(),
             ]),
             'specialites' => Technicien::SPECIALITES,
+        ]);
+    }
+
+    /**
+     * Afficher le badge QR d'un technicien
+     */
+    public function badge(Technicien $technicien)
+    {
+        $user = request()->user();
+        if (!$this->canAccessTechnicien($user, $technicien)) {
+            abort(403, 'Accès non autorisé à ce technicien.');
+        }
+        return Inertia::render('techniciens/badge', [
+            'technicien' => [
+                'id' => $technicien->id,
+                'nom' => $technicien->nom,
+                'prenom' => $technicien->prenom,
+                'specialite_label' => $technicien->specialite_label,
+                'qr_code' => $technicien->qr_code,
+                'photo_reference' => $technicien->photo_reference,
+            ],
+        ]);
+    }
+
+    /**
+     * Afficher tous les badges QR des techniciens
+     */
+    public function badgesAll()
+    {
+        $user = request()->user();
+        
+        // Récupérer tous les techniciens accessibles
+        if ($user->hasRole('admin')) {
+            $techniciens = Technicien::all();
+        } else {
+            // Chef Chantier: récupère les techniciens de ses chantiers
+            $technicienIds = $this->getUserTechnicienIds($user);
+            if ($technicienIds === null) {
+                $techniciens = Technicien::all();
+            } else {
+                $techniciens = Technicien::whereIn('id', $technicienIds)->get();
+            }
+        }
+
+        $badges = $techniciens->map(function ($tech) {
+            return [
+                'id' => $tech->id,
+                'nom' => $tech->nom,
+                'prenom' => $tech->prenom,
+                'specialite' => $tech->specialite,
+                'specialite_label' => $tech->specialite_label,
+                'qr_code' => $tech->qr_code,
+                'photo_reference' => $tech->photo_reference,
+            ];
+        });
+
+        return Inertia::render('techniciens/badges', [
+            'techniciens' => $badges->values(),
         ]);
     }
 
@@ -238,6 +328,7 @@ class TechnicienController extends Controller
             abort(403, 'Accès non autorisé à ce technicien.');
         }
 
+
         $validated = $request->validate([
             'nom' => 'required|string|max:255',
             'prenom' => 'nullable|string|max:255',
@@ -247,7 +338,14 @@ class TechnicienController extends Controller
             'salaire_journalier' => 'nullable|numeric|min:0',
             'disponible' => 'boolean',
             'notes' => 'nullable|string',
+            'photo' => 'nullable|image|max:2048',
         ]);
+
+        // Gérer l'upload de la photo (remplace l'ancienne si nouvelle)
+        if ($request->hasFile('photo')) {
+            $path = $request->file('photo')->store('techniciens', 'public');
+            $validated['photo_reference'] = '/storage/' . $path;
+        }
 
         $technicien->update($validated);
 

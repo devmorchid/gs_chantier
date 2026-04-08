@@ -48,6 +48,7 @@ import {
     Phone,
     UserCheck,
     UserX,
+    QrCode,
 } from 'lucide-react';
 
 interface Equipe {
@@ -145,12 +146,20 @@ export default function TechniciensIndex({ techniciens, specialites, filters }: 
                             Gérez les techniciens et ouvriers
                         </p>
                     </div>
-                    <Link href="/techniciens/create">
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Nouveau Technicien
-                        </Button>
-                    </Link>
+                    <div className="flex gap-2">
+                        <Link href="/techniciens/badges/all">
+                            <Button variant="outline">
+                                <QrCode className="mr-2 h-4 w-4" />
+                                Tous les Badges
+                            </Button>
+                        </Link>
+                        <Link href="/techniciens/create">
+                            <Button>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Nouveau Technicien
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
                 {/* Filters */}
@@ -274,6 +283,12 @@ export default function TechniciensIndex({ techniciens, specialites, filters }: 
                                                         <Link href={`/techniciens/${technicien.id}`}>
                                                             <Eye className="mr-2 h-4 w-4" />
                                                             Voir
+                                                        </Link>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem asChild>
+                                                        <Link href={`/techniciens/${technicien.id}/badge`}>
+                                                            <QrCode className="mr-2 h-4 w-4" />
+                                                            Badge QR
                                                         </Link>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem asChild>
